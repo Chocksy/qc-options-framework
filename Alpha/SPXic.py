@@ -25,7 +25,7 @@ class SPXic(Base):
         "useLimitOrders": True,
         "limitOrderRelativePriceAdjustment": 0.2,
         # Alternative method to set the absolute price (per contract) of the Limit Order. This method is used if a number is specified
-        "limitOrderAbsolutePrice": 0.90,
+        "limitOrderAbsolutePrice": 1.0,
         "limitOrderExpiration": timedelta(minutes=5),
         # Coarse filter for the Universe selection. It selects nStrikes on both sides of the ATM
         # strike for each available expiration
@@ -36,17 +36,17 @@ class SPXic(Base):
         "maxOrderQuantity": 1000,
         "targetPremiumPct": 0.015,
         # Minimum premium accepted for opening a new position. Setting this to None disables it.
-        "minPremium": 1.4,
+        "minPremium": 1.0,
         # Maximum premium accepted for opening a new position. Setting this to None disables it.
-        "maxPremium": 1.9,
+        "maxPremium": 1.2,
         # Profit Target Factor (Multiplier of the premium received/paid when the position was opened)
         "profitTarget": 1.0,
         "bidAskSpreadRatio": 0.4,
         "validateBidAskSpread": True,
         "marketCloseCutoffTime": None, #time(15, 45, 0),
         # Put/Call Wing size for Iron Condor, Iron Fly
-        "putWingSize": 25,
-        "callWingSize": 25,
+        "putWingSize": 10,
+        "callWingSize": 10,
         # "targetPremium": 500,
     }
 
@@ -63,7 +63,9 @@ class SPXic(Base):
         # Best time to open the trade: 9:45 + 10:15 + 12:30 + 13:00 + 13:30 + 13:45 + 14:00 + 15:00 + 15:15 + 15:45
         # https://tradeautomationtoolbox.com/byob-ticks/?save=admZ4dG
         if data.ContainsKey(self.underlyingSymbol):
-            trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0), time(15, 0, 0), time(15, 15, 0), time(15, 45, 0)]
+            # trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0), time(15, 0, 0), time(15, 15, 0), time(15, 45, 0)]
+            
+            trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0)]
             current_time = self.context.Time.time()
             if current_time not in trade_times:
                 return None

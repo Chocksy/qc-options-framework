@@ -131,7 +131,7 @@ class LimitOrderHandler:
         if orderType.lower() == 'close':
             log_message += f", Reason: {position.closeReason}"
         # To limit logs just log every 25 minutes
-        self.logger.debug(log_message)
+        self.logger.info(log_message)
 
         ### for contract in contracts
         if isComboOrder:

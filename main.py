@@ -34,8 +34,8 @@ class CentralAlgorithm(QCAlgorithm):
     def Initialize(self):
         # WARNING!! If your are going to trade SPX 0DTE options then make sure you set the startDate after July 1st 2022.
         # This is the start of the data we have.
-        self.SetStartDate(2021, 8, 1)
-        self.SetEndDate(2022, 4, 1)
+        self.SetStartDate(2022, 8, 1)
+        self.SetEndDate(2022, 11, 1)
         # self.SetStartDate(2024, 4, 1)
         # self.SetEndDate(2024, 4, 30)
         # self.SetEndDate(2022, 9, 15)
