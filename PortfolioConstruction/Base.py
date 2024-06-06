@@ -9,6 +9,7 @@ from Tools import Helper
 class Base(PortfolioConstructionModel):
     def __init__(self, context):
         self.context = context
+        self.context.logger.debug(f"{self.__class__.__name__} -> __init__")
 
     # Create list of PortfolioTarget objects from Insights
     def CreateTargets(self, algorithm: QCAlgorithm, insights: List[Insight]) -> List[PortfolioTarget]:

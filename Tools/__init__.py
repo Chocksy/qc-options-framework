@@ -8,5 +8,6 @@ from .Underlying import Underlying
 from .BSMLibrary import BSM, BSMGreeks
 from .Helper import Helper
 from .Charting import Charting
+from .Performance import Performance
 #endregion
 

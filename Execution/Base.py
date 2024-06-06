@@ -33,7 +33,6 @@ class Base(ExecutionModel):
 
     def __init__(self, context):
         self.context = context
-
         # Calculate maxRetries based on speedOfFill
         speedOfFill = self.parameter("speedOfFill")
         if speedOfFill == "Patient":
@@ -51,7 +50,7 @@ class Base(ExecutionModel):
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
         self.marketOrderHandler = MarketOrderHandler(context, self)
         self.limitOrderHandler = LimitOrderHandler(context, self)
-
+        self.logger.debug(f"{self.__class__.__name__} -> __init__")
         # Gets or sets the maximum spread compare to current price in percentage.
         # self.acceptingSpreadPercent = Math.Abs(acceptingSpreadPercent)
         # self.executionTimeThreshold = timedelta(minutes=10)
@@ -76,7 +75,7 @@ class Base(ExecutionModel):
 
         # Check if the workingOrders are still OK to execute
         self.context.structure.checkOpenPositions()
-
+        self.logger.debug(f"{self.__class__.__name__} -> Execute -> checkOpenPositions")
         for order in list(self.context.workingOrders.values()):
             position = self.context.allPositions[order.orderId]
 

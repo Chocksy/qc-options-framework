@@ -75,16 +75,18 @@ class SetupBaseStructure:
 
         # Set the timer to monitor the execution performance
         self.context.executionTimer = Timer(self.context)
-
+        self.context.logger.debug(f'{self.__class__.__name__} -> Setup')
         # Set brokerage model and margin account
         self.context.SetBrokerageModel(BrokerageName.InteractiveBrokersBrokerage, AccountType.Margin)
+        # override security position group model
+        self.context.Portfolio.SetPositions(SecurityPositionGroupModel.Null)
+        # Set requested data resolution
+        self.context.universe_settings.resolution = self.context.timeResolution
 
         # Keep track of the option contract subscriptions
         self.context.optionContractsSubscriptions = []
-
         # Set Security Initializer
         self.context.SetSecurityInitializer(self.CompleteSecurityInitializer)
-
         # Initialize the dictionary to keep track of all positions
         self.context.allPositions = {}
 
@@ -112,7 +114,6 @@ class SetupBaseStructure:
 
         # Assign the DEFAULT_PARAMETERS
         self.AddConfiguration(**SetupBaseStructure.DEFAULT_PARAMETERS)
-
         self.SetBacktestCutOffTime()
 
         # Set charting
@@ -133,8 +134,11 @@ class SetupBaseStructure:
     # Called every time a security (Option or Equity/Index) is initialized
     def CompleteSecurityInitializer(self, security: Security) -> None:
         '''Initialize the security with raw prices'''
-        # override security position group model
-        self.context.Portfolio.SetPositions(SecurityPositionGroupModel.Null)
+        self.context.logger.debug(f"{self.__class__.__name__} -> CompleteSecurityInitializer -> Security: {security}")
+        if self.context.LiveMode:
+            return
+
+        self.context.executionTimer.start()
 
         security.SetDataNormalizationMode(DataNormalizationMode.Raw)
         security.SetMarketPrice(self.context.GetLastKnownPrice(security))
@@ -146,7 +150,9 @@ class SetupBaseStructure:
             # This is for stocks
             security.VolatilityModel = StandardDeviationOfReturnsVolatilityModel(30)
             history = self.context.History(security.Symbol, 31, Resolution.Daily)
+
             if history.empty or 'close' not in history.columns:
+                self.context.executionTimer.stop()
                 return
 
             for time, row in history.loc[security.Symbol].iterrows():
@@ -160,10 +166,10 @@ class SetupBaseStructure:
             security.SetFeeModel(TastyWorksFeeModel())
             security.PriceModel = OptionPriceModels.CrankNicolsonFD()
             # security.set_option_assignment_model(NullOptionAssignmentModel())
-        
         if security.Type == SecurityType.IndexOption:
             # disable option assignment. This is important for SPX but we disable for all for now.
             security.SetOptionAssignmentModel(NullOptionAssignmentModel())
+        self.context.executionTimer.stop()
 
     def ClearSecurity(self, security: Security) -> None:
         """
@@ -200,27 +206,27 @@ class SetupBaseStructure:
         self.context.strategies.append(strategy)
         # Store the algorithm base variables
         strategy.ticker = ticker
-
+        self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Ticker: {ticker}")
         # Add the underlying and the option chain to the algorithm
         strategy.dataHandler = DataHandler(self.context, ticker, strategy)
         underlying = strategy.dataHandler.AddUnderlying(self.context.timeResolution)
         option = strategy.dataHandler.AddOptionsChain(underlying, self.context.timeResolution)
         # Set data normalization mode to Raw
         underlying.SetDataNormalizationMode(DataNormalizationMode.Raw)
-
+        self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Underlying: {underlying}")
         # Keep track of the option contract subscriptions
         self.context.optionContractsSubscriptions = []
 
         # Set the option chain filter function
         option.SetFilter(strategy.dataHandler.SetOptionFilter)
-
+        self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Option: {option}")
         # Store the symbol for the option and the underlying
         strategy.underlyingSymbol = underlying.Symbol
         strategy.optionSymbol = option.Symbol
 
         # Set the benchmark.
         self.context.SetBenchmark(underlying.Symbol)
-
+        self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Benchmark: {self.context.Benchmark}")
         # Creating a 5-minute consolidator.
         # self.AddConsolidators(strategy.underlyingSymbol, 5)
 
@@ -234,7 +240,7 @@ class SetupBaseStructure:
         )
 
         return self
-    
+
     def AddConsolidators(self, symbol, minutes=5):
         consolidator = TradeBarConsolidator(timedelta(minutes=minutes))
         # Subscribe to the DataConsolidated event
@@ -282,13 +288,14 @@ class SetupBaseStructure:
     # This just clears the workingOrders that are supposed to be expired or unfilled. It can happen when an order is not filled
     # for it to stay in check until next day. This will clear that out. Similar method to the monitor one.
     def checkOpenPositions(self):
+        self.context.executionTimer.start()
         # Iterate over all option contracts and remove the expired ones from the 
         for symbol, security in self.context.Securities.items():
             # Check if the security is an option
             if security.Type == SecurityType.Option:
                 # Check if the option has expired
                 if security.Expiry < self.context.Time:
-                    # self.context.logger.info(f"  >>>  EXPIRED SECURITY-----> Removing expired option contract {security.Symbol} from the algorithm.")
+                    self.context.logger.trace(f"  >>>  EXPIRED SECURITY-----> Removing expired option contract {security.Symbol} from the algorithm.")
                     # Remove the expired option contract
                     self.ClearSecurity(security)
 
@@ -302,7 +309,7 @@ class SetupBaseStructure:
                 self.context.charting.updateStats(position)
                 self.context.logger.info(f"  >>>  EXPIRED POSITION-----> Removing expired position {position.orderTag} from the algorithm.")
                 self.context.openPositions.pop(orderTag)
-        
+
         # Remove the expired positions from the workingOrders dictionary. These are positions that expired
         # without being filled completely.
         for order in list(self.context.workingOrders.values()):
@@ -325,5 +332,4 @@ class SetupBaseStructure:
                     self.context.workingOrders.pop(orderTag)
                 # Mark the order as being cancelled
                 position.cancelOrder(self.context, orderType=orderType, message=f"order execution expiration or legs expired")
-
-
+        self.context.executionTimer.stop()

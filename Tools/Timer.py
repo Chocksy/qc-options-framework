@@ -46,10 +46,11 @@ class Timer:
 
     def showStats(self, methodName=None):
         methods = methodName or self.performance.keys()
+        total_elapsed = 0.0  # Initialize total elapsed time
         for method in methods:
             performance = self.performance.get(method)
             if performance:
-                self.context.logger.info(f"Execution Stats ({method}):")
+                self.context.Log(f"Execution Stats ({method}):")
                 for key in performance:
                     if key != "startTime":
                         if key == "calls" or performance[key] == None:
@@ -58,6 +59,10 @@ class Timer:
                             value = None
                         else:
                             value = timedelta(seconds=performance[key])
-                        self.context.logger.info(f"  --> {key}:{value}")
+                        self.context.Log(f"  --> {key}:{value}")
+                total_elapsed += performance.get("elapsedTotal", 0)  # Accumulate elapsedTotal
             else:
-                self.context.logger.warning(f"There are no execution stats available for method {method}!")
+                self.context.Log(f"There are no execution stats available for method {method}!")
+        # Print the total elapsed time over all methods
+        self.context.Log("Summary:")
+        self.context.Log(f"  --> elapsedTotal: {timedelta(seconds=total_elapsed)}")

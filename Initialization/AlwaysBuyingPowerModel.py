@@ -11,6 +11,8 @@ class AlwaysBuyingPowerModel(BuyingPowerModel):
     def HasSufficientBuyingPowerForOrder(self, parameters):
         # custom behavior: this model will assume that there is always enough buying power
         hasSufficientBuyingPowerForOrderResult = HasSufficientBuyingPowerForOrderResult(True)
-        self.context.Log(f"CustomBuyingPowerModel: {hasSufficientBuyingPowerForOrderResult.IsSufficient}")
+        self.context.logger.debug(f"CustomBuyingPowerModel: {hasSufficientBuyingPowerForOrderResult.IsSufficient}")
 
         return hasSufficientBuyingPowerForOrderResult
+
+

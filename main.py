@@ -12,6 +12,7 @@ from PortfolioConstruction import OptionsPortfolioConstruction
 from Alpha import FPLModel, CCModel, SPXic, SPXButterfly, SPXCondor
 # The execution classes
 from Initialization import SetupBaseStructure, HandleOrderEvents
+from Tools import Performance
 
 
 """
@@ -34,8 +35,8 @@ class CentralAlgorithm(QCAlgorithm):
     def Initialize(self):
         # WARNING!! If your are going to trade SPX 0DTE options then make sure you set the startDate after July 1st 2022.
         # This is the start of the data we have.
-        self.SetStartDate(2022, 8, 1)
-        self.SetEndDate(2022, 11, 1)
+        self.SetStartDate(2023, 3, 1)
+        self.SetEndDate(2023, 4, 1)
         # self.SetStartDate(2024, 4, 1)
         # self.SetEndDate(2024, 4, 30)
         # self.SetEndDate(2022, 9, 15)
@@ -48,12 +49,13 @@ class CentralAlgorithm(QCAlgorithm):
         #  -> 2 = INFO
         #  -> 3 = DEBUG
         #  -> 4 = TRACE (Attention!! This can consume your entire daily log limit)
-        self.logLevel = 2
+        self.logLevel = 3 if self.LiveMode else 0
+
 
         # Set the initial account value
         self.initialAccountValue = 100_000
         self.SetCash(self.initialAccountValue)
-        
+
         # Time Resolution
         self.timeResolution = Resolution.Minute
 
@@ -63,9 +65,13 @@ class CentralAlgorithm(QCAlgorithm):
         self.showTradeLog = False
         # Show the execution statistics
         self.showExecutionStats = False
+        # Show the performance statistics
+        self.showPerformanceStats = True
 
         # Set the algorithm base variables and structures
         self.structure = SetupBaseStructure(self).Setup()
+
+        self.performance = Performance(self)
 
         # Set the algorithm framework models
         # self.SetAlpha(FPLModel(self))
@@ -98,12 +104,18 @@ class CentralAlgorithm(QCAlgorithm):
         for security in changes.RemovedSecurities:
             self.structure.ClearSecurity(security)
 
+    def OnEndOfDay(self, symbol):
+        self.structure.checkOpenPositions()
+        self.performance.endOfDay(symbol)
+
     def OnOrderEvent(self, orderEvent):
         # Start the timer
         self.executionTimer.start()
 
         # Log the order event
         self.logger.debug(orderEvent)
+
+        self.performance.OnOrderEvent(orderEvent)
 
         HandleOrderEvents(self, orderEvent).Call()
         # Loop through all strategies
@@ -127,6 +139,12 @@ class CentralAlgorithm(QCAlgorithm):
             self.Log("---------------------------------")
             self.executionTimer.showStats()
             self.Log("")
+        if self.showPerformanceStats:
+            self.Log("---------------------------------")
+            self.Log("     Performance Statistics       ")
+            self.Log("---------------------------------")
+            self.performance.show()
+            self.Log("")
             self.Log("")
 
         if self.showTradeLog:
@@ -137,7 +155,7 @@ class CentralAlgorithm(QCAlgorithm):
             if self.CSVExport:
                 # Print the csv header
                 self.Log(dfAllPositions.head(0).to_csv(index = False, header = True, line_terminator = " "))
-                # Print the data frame to the log in csv format (one row at the time to avoid QC truncation limitation)
+                # Print the data frame to the log in csv format (one row at a time to avoid QC truncation limitation)
                 for i in range(0, len(dfAllPositions.index)):
                     self.Log(dfAllPositions.iloc[[i]].to_csv(index = False, header = False, line_terminator = " "))
             else:

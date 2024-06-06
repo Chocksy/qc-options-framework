@@ -58,14 +58,18 @@ class SPXic(Base):
         self.nameTag = "SPXic"
         self.ticker = "SPX"
         self.context.structure.AddUnderlying(self, self.ticker)
+        self.logger.debug(f"{self.__class__.__name__} -> __init__ -> AddUnderlying")
+
 
     def getOrder(self, chain, data):
+        self.logger.debug(f"{self.__class__.__name__} -> getOrder -> start")
         # Best time to open the trade: 9:45 + 10:15 + 12:30 + 13:00 + 13:30 + 13:45 + 14:00 + 15:00 + 15:15 + 15:45
         # https://tradeautomationtoolbox.com/byob-ticks/?save=admZ4dG
         if data.ContainsKey(self.underlyingSymbol):
+            # self.logger.debug(f"SPXic -> getOrder: Data contains key {self.underlyingSymbol}")
             # trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0), time(15, 0, 0), time(15, 15, 0), time(15, 45, 0)]
-            
-            trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0)]
+            # trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0)]
+            trade_times = [time(hour, minute, 0) for hour in range(9, 15) for minute in range(0, 60, 5) if not (hour == 14 and minute > 0)]
             current_time = self.context.Time.time()
             if current_time not in trade_times:
                 return None
@@ -85,7 +89,8 @@ class SPXic(Base):
                 wingSize=self.putWingSize,
                 sell=True
             )
-
+            # self.logger.debug(f"SPXic -> getOrder: Call: {call}")
+            # self.logger.debug(f"SPXic -> getOrder: Put: {put}")
             if call is not None and put is not None:
                 return [call, put]
             else:

@@ -102,7 +102,10 @@ class Base(AlphaModel):
         # Controls whether to track the details on each leg across the life of the trade
         "trackLegDetails": False,
         # Controls which greeks are included in the output log
-        "greeksIncluded": ["Delta", "Gamma", "Vega", "Theta", "Rho", "Vomma", "Elasticity"],
+        # "greeksIncluded": ["Delta", "Gamma", "Vega", "Theta", "Rho", "Vomma", "Elasticity"],
+        "greeksIncluded": [],
+        # Controls whether to compute the greeks for the strategy. If True, the greeks will be computed and stored in the contract under BSMGreeks.
+        "computeGreeks": False,
         # The time (on expiration day) at which any position that is still open will closed
         "marketCloseCutoffTime": time(15, 45, 0),
         # Limit Order Management
@@ -180,6 +183,7 @@ class Base(AlphaModel):
         # This will hold any details related to the underlying.
         # For example, the underlying price at the time of opening of day
         self.stats = Stats()
+        self.logger.debug(f'{self.name} -> __init__')
 
     @staticmethod
     def getNextOrderId():
@@ -195,16 +199,24 @@ class Base(AlphaModel):
     def parameter(cls, key, default=None):
         return cls.getMergedParameters().get(key, default)
 
-    def Update(self, algorithm: QCAlgorithm, data: Slice) -> List[Insight]:
+    def update(self, algorithm: QCAlgorithm, data: Slice) -> List[Insight]:
         insights = []
         # Start the timer
         self.context.executionTimer.start('Alpha.Base -> Update')
-
+        self.logger.debug(f'{self.name} -> update -> start')
+        self.logger.debug(f'Is Warming Up: {self.context.IsWarmingUp}')
+        self.logger.debug(f'Is Market Open: {self.context.IsMarketOpen(self.underlyingSymbol)}')
+        self.logger.debug(f'Time: {self.context.Time.time()}')
         # Exit if the algorithm is warming up or the market is closed (avoid processing orders on the last minute as these will be executed the following day)
         if self.context.IsWarmingUp or\
            not self.context.IsMarketOpen(self.underlyingSymbol) or\
            self.context.Time.time() >= time(16, 0, 0):
             return insights
+        
+        self.logger.debug(f'Did Alpha UPDATE after warmup?!?')
+        # This thing just passes the data to the performance tool so we can keep track of all 
+        # symbols. This should not be needed if the culprit of the slonwess of backtesting is sorted.
+        self.context.performance.OnUpdate(data)
 
         # Update the stats dictionary
         self.syncStats()
@@ -214,6 +226,10 @@ class Base(AlphaModel):
 
         # Run the strategies to open new positions
         filteredChain, lastClosedOrderTag = Scanner(self.context, self).Call(data)
+
+        self.logger.debug(f'Did Alpha SCAN')
+        self.logger.debug(f'Filtered Chain: {filteredChain}')
+        self.logger.debug(f'Last Closed Order Tag: {lastClosedOrderTag}')
         if filteredChain is not None:
             if self.stats.hasOptions == False:
                 self.logger.info(f"Found options {self.context.Time.strftime('%A, %Y-%m-%d %H:%M')}")
@@ -263,7 +279,7 @@ class Base(AlphaModel):
 
             # Keep track of all the working orders
             context.workingOrders[orderTag] = {}
-            
+
             # Map each contract to the openPosition dictionary (key: expiryStr)
             context.workingOrders[orderTag] = workingOrder
 

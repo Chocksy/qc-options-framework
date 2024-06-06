@@ -36,6 +36,7 @@ class Base(RiskManagementModel):
     def __init__(self, context):
         self.context = context
         self.context.structure.AddConfiguration(parent=self, **self.getMergedParameters())
+        self.context.logger.debug(f"{self.__class__.__name__} -> __init__")
 
     @classmethod
     def getMergedParameters(cls):
@@ -54,7 +55,7 @@ class Base(RiskManagementModel):
         # We are basically ignoring the current portfolio targets to be assessed for risk
         # and building our own based on the current open positions
         targets = []
-
+        self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> start")
         managePositionFrequency = max(self.managePositionFrequency, 1)
 
         # Continue the processing only if we are at the specified schedule
@@ -63,7 +64,7 @@ class Base(RiskManagementModel):
 
         # Method to allow child classes access to the manageRisk method before any changes are made
         self.preManageRisk()
-
+        self.context.Log(f"{self.__class__.__name__} -> ManageRisk -> preManageRisk")
         # Loop through all open positions
         for orderTag, orderId in list(self.context.openPositions.items()):
             # Skip this contract if in the meantime it has been removed by the onOrderEvent
@@ -473,3 +474,4 @@ class Base(RiskManagementModel):
     def OnSecuritiesChanged(self, algorithm: QCAlgorithm, changes: SecurityChanges) -> None:
         pass
             
+

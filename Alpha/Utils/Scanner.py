@@ -18,36 +18,38 @@ class Scanner:
     def Call(self, data) -> [Dict, str]:
         # Start the timer
         self.context.executionTimer.start('Alpha.Utils.Scanner -> Call')
-
+        self.logger.debug(f'{self.base.name} -> Call -> start')
         if self.isMarketClosed():
             self.logger.trace(" -> Market is closed.")
             return None, None
-
+        self.logger.debug(f'Market not closed')
         if not self.isWithinScheduledTimeWindow():
             self.logger.trace(" -> Not within scheduled time window.")
             return None, None
-
+        self.logger.debug(f'Not within scheduled time window')
         if self.hasReachedMaxActivePositions():
             self.logger.trace(" -> Already reached max active positions.")
             return None, None
-
-        # Get the option chain
+        self.logger.debug(f'Reached max active positions')
+        # Get the option chain 
         chain = self.base.dataHandler.getOptionContracts(data)
-
+        self.logger.debug(f'Chain: {chain}')
         # Exit if we got no chains
         if chain is None:
             self.logger.debug(" -> No chains inside currentSlice!")
             return None, None
-
+        self.logger.debug('No chains inside currentSlice')
         self.syncExpiryList(chain)
-
+        self.logger.debug(f'Expiry List: {self.expiryList}')
         # Exit if we haven't found any Expiration cycles to process
         if not self.expiryList:
             self.logger.trace(" -> No expirylist.")
             return None, None
-
+        self.logger.debug('No expirylist')
         # Run the strategy
         filteredChain, lastClosedOrderTag = self.Filter(chain)
+        self.logger.debug(f'Filtered Chain: {filteredChain}')
+        self.logger.debug(f'Last Closed Order Tag: {lastClosedOrderTag}')
         # Stop the timer
         self.context.executionTimer.stop('Alpha.Utils.Scanner -> Call')
         return filteredChain, lastClosedOrderTag
@@ -59,7 +61,7 @@ class Scanner:
 
         # Get the context
         context = self.context
-
+        self.logger.debug(f'Context: {context}')
         # DTE range
         dte = self.base.dte
         dteWindow = self.base.dteWindow
@@ -70,17 +72,18 @@ class Scanner:
         dynamicDTESelection = self.base.dynamicDTESelection
         # Controls whether to allow multiple entries for the same expiry date
         allowMultipleEntriesPerExpiry = self.base.allowMultipleEntriesPerExpiry
-
+        self.logger.debug(f'Allow Multiple Entries Per Expiry: {allowMultipleEntriesPerExpiry}')
         # Set the DTE range (make sure values are not negative)
         minDte = max(0, dte - dteWindow)
         maxDte = max(0, dte)
-
+        self.logger.debug(f'Min DTE: {minDte}')
+        self.logger.debug(f'Max DTE: {maxDte}')
         # Get the minimum time distance between consecutive trades
         minimumTradeScheduleDistance = self.base.parameter("minimumTradeScheduleDistance", timedelta(hours=0))
         # Make sure the minimum required amount of time has passed since the last trade was opened
         if (self.context.lastOpenedDttm is not None and context.Time < (self.context.lastOpenedDttm + minimumTradeScheduleDistance)):
             return None, None
-
+        self.logger.debug(f'Min Trade Schedule Distance: {minimumTradeScheduleDistance}')
         # Check if the expiryList was specified as an input
         if self.expiryList is None:
             # List of expiry dates, sorted in reverse order
@@ -88,17 +91,18 @@ class Scanner:
                 contract.Expiry for contract in chain
                 if minDte <= (contract.Expiry.date() - context.Time.date()).days <= maxDte
             ]), reverse=True)
+            self.logger.debug(f'Expiry List: {self.expiryList}')
             # Log the list of expiration dates found in the chain
             self.logger.debug(f"Expiration dates in the chain: {len(self.expiryList)}")
             for expiry in self.expiryList:
                 self.logger.debug(f" -> {expiry}")
-
+        self.logger.debug(f'Expiry List: {self.expiryList}')
         # Exit if we haven't found any Expiration cycles to process
         if not self.expiryList:
             # Stop the timer
             self.context.executionTimer.stop()
             return None, None
-
+        self.logger.debug('No expirylist')
         # Get the DTE of the last closed position
         lastClosedDte = None
         lastClosedOrderTag = None
@@ -111,7 +115,8 @@ class Scanner:
                     lastClosedOrderTag = lastClosedTradeInfo["orderTag"]
                     # We got a good entry, get out of the loop
                     break
-
+        self.logger.debug(f'Last Closed DTE: {lastClosedDte}')
+        self.logger.debug(f'Last Closed Order Tag: {lastClosedOrderTag}')
         # Check if we need to do dynamic DTE selection
         if dynamicDTESelection and lastClosedDte is not None:
             # Get the expiration with the nearest DTE as that of the last closed position
@@ -126,7 +131,7 @@ class Scanner:
             expiryListIndex = int(useFurthestExpiry) - 1
             # Get the expiry date
             expiry = list(self.expiryList.keys())[expiryListIndex]
-
+        self.logger.debug(f'Expiry: {expiry}')
         # Convert the date to a string
         expiryStr = expiry.strftime("%Y-%m-%d")
 
@@ -136,7 +141,7 @@ class Scanner:
         if (allowMultipleEntriesPerExpiry or expiryStr not in openPositionsExpiries):
             # Filter the contracts in the chain, keep only the ones expiring on the given date
             filteredChain = self.filterByExpiry(chain, expiry=expiry)
-
+        self.logger.debug(f'Filtered Chain: {filteredChain}')
         # Stop the timer
         self.context.executionTimer.stop("Alpha.Utils.Scanner -> Filter")
 

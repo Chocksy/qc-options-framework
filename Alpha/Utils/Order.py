@@ -210,7 +210,8 @@ class Order:
         contractExpiry = {}
 
         # Compute the Greeks for each contract (if not already available)
-        self.bsm.setGreeks(contracts)
+        if self.base.computeGreeks:
+            self.bsm.setGreeks(contracts)
 
         # Compute the Mid-Price and Bid-Ask spread for the full order
         orderMidPrice = 0.0
@@ -255,15 +256,16 @@ class Order:
             strikes[f"{orderSideDesc}"] = contract.Strike
             # Add the contract expiration time and add 16 hours to the market close
             contractExpiry[f"{orderSideDesc}"] = contract.Expiry + timedelta(hours = 16)
-            # Set the Greeks and IV in the dictionary -> "<short|long><Call|Put>": <greek|IV>
-            delta[f"{orderSideDesc}"] = contract.BSMGreeks.Delta
-            gamma[f"{orderSideDesc}"] = contract.BSMGreeks.Gamma
-            vega[f"{orderSideDesc}"] = contract.BSMGreeks.Vega
-            theta[f"{orderSideDesc}"] = contract.BSMGreeks.Theta
-            rho[f"{orderSideDesc}"] = contract.BSMGreeks.Rho
-            vomma[f"{orderSideDesc}"] = contract.BSMGreeks.Vomma
-            elasticity[f"{orderSideDesc}"] = contract.BSMGreeks.Elasticity
-            IV[f"{orderSideDesc}"] = contract.BSMImpliedVolatility
+            if hasattr(contract, "BSMGreeks"):
+                # Set the Greeks and IV in the dictionary -> "<short|long><Call|Put>": <greek|IV>
+                delta[f"{orderSideDesc}"] = contract.BSMGreeks.Delta
+                gamma[f"{orderSideDesc}"] = contract.BSMGreeks.Gamma
+                vega[f"{orderSideDesc}"] = contract.BSMGreeks.Vega
+                theta[f"{orderSideDesc}"] = contract.BSMGreeks.Theta
+                rho[f"{orderSideDesc}"] = contract.BSMGreeks.Rho
+                vomma[f"{orderSideDesc}"] = contract.BSMGreeks.Vomma
+                elasticity[f"{orderSideDesc}"] = contract.BSMGreeks.Elasticity
+                IV[f"{orderSideDesc}"] = contract.BSMImpliedVolatility
 
             # Get the latest mid-price
             midPrice = self.contractUtils.midPrice(contract)
@@ -272,7 +274,7 @@ class Order:
             # Compute the bid-ask spread
             bidAskSpread += self.contractUtils.bidAskSpread(contract)
             # Adjusted mid-price (include slippage). Take the sign of orderSide to determine the direction of the adjustment
-            adjustedMidPrice = midPrice + np.sign(orderSide) * slippage
+            # adjustedMidPrice = midPrice + np.sign(orderSide) * slippage
             # Keep track of the total credit/debit or the order
             orderMidPrice -= orderSide * midPrice
 
@@ -325,12 +327,13 @@ class Order:
         TReg = min(0, orderMidPrice + maxLoss) * orderQuantity
 
         portfolioMarginStress = self.context.portfolioMarginStress
-        # Compute the projected P&L of the position following a % movement of the underlying up or down
-        portfolioMargin = min(
-            0,
-            self.fValue(underlyingPrice * (1-portfolioMarginStress), contracts, sides=sides, atTime=context.Time, openPremium=midPrice),
-            self.fValue(underlyingPrice * (1+portfolioMarginStress), contracts, sides=sides, atTime=context.Time, openPremium=midPrice)
-        ) * orderQuantity
+        if self.base.computeGreeks:
+            # Compute the projected P&L of the position following a % movement of the underlying up or down
+            portfolioMargin = min(
+                0,
+                self.fValue(underlyingPrice * (1-portfolioMarginStress), contracts, sides=sides, atTime=context.Time, openPremium=midPrice),
+                self.fValue(underlyingPrice * (1+portfolioMarginStress), contracts, sides=sides, atTime=context.Time, openPremium=midPrice)
+            ) * orderQuantity
 
         order = {
             "strategyId": strategyId,
@@ -341,7 +344,6 @@ class Order:
             "orderQuantity": orderQuantity,
             "maxOrderQuantity": maxOrderQuantity,
             "targetPremium": targetPremium,
-            "IV": IV,
             "strikes": strikes,
             "sides": sides,
             "sidesDesc": sidesDesc,
