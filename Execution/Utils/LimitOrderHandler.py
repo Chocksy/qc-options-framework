@@ -110,7 +110,11 @@ class LimitOrderHandler:
             orderSide = orderSign * orderSides[n]
             if orderSide != 0:
                 newLimitPrice = self.contractUtils.midPrice(contract) + adjustmentValue if orderSide == -1 else self.contractUtils.midPrice(contract) - adjustmentValue
-                newLimitPrice = max(0.01, newLimitPrice) # ensures we don't have 0 for newLimitPrice or under. 0 Gives an error.
+                # round the price or we get an error like:
+                # Adjust the limit price to meet brokerage precision requirements
+                increment = self.base.adjustmentIncrement if self.base.adjustmentIncrement is not None else 0.05
+                newLimitPrice = round(newLimitPrice / increment) * increment
+                newLimitPrice = round(newLimitPrice, 1)  # Ensure the price is rounded to two decimal places
 
                 if isComboOrder:
                     legs.append(Leg.Create(contract.Symbol, orderSide, newLimitPrice))
