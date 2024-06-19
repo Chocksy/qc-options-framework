@@ -12,10 +12,6 @@ In order to make this easier you need to have quantconnect running on local dev.
 5. Copy all the files from the cloned repo to this quantconnect algo
 6. Start creating your own AlphaModel, MonitorModel and ExecutionModel (optional)
 
-## Notes
-
-This whole code started from the [rccannizzaro](https://github.com/rccannizzaro/QC-StrategyBacktest?tab=readme-ov-file) repository and the amazing work done there. I started tinkering with it and then eventually hit the limit of over 250+ lines for one file on QC so then it evolved into this one.
-The code here seems like it follows the principle layed down by QC in their lean framework documentation but in fact there is no 100% separation of concern as we have the communication between classes done via a dataclass of trades and positions. The reason for this is the fact that QC does not allow for more details to be added to Insights and in order to get better management and control we need to just use our own positions dataclass.
 
 ## Some explanation of how it works
 
@@ -29,4 +25,10 @@ The code here seems like it follows the principle layed down by QC in their lean
 - you can see the initial variables attached to **self.context** (that is actually the algorithm instance) by going to [SetupBaseStructure.py](https://github.com/Chocksy/qc-options-framework/blob/main/Initialization/SetupBaseStructure.py)
 - all the positions are instances of [Strategy/Position.py](https://github.com/Chocksy/qc-options-framework/blob/main/Strategy/Position.py) a dataclass with defined attributes
 - the [Strategy/Position.py](https://github.com/Chocksy/qc-options-framework/blob/main/Strategy/Position.py) also holds dataclasses for WorkingOrders and Legs.
+
+
+## Notes
+
+This whole code started from the [rccannizzaro](https://github.com/rccannizzaro/QC-StrategyBacktest?tab=readme-ov-file) repository and the amazing work done there. I started tinkering with it and then eventually hit the limit of over 250+ lines for one file on QC so then it evolved into this one.
+The code here seems like it follows the principle layed down by QC in their lean framework documentation but in fact there is no 100% separation of concern as we have the communication between classes done via a dataclass of trades and positions. The reason for this is the fact that QC does not allow for more details to be added to Insights and in order to get better management and control we need to just use our own positions dataclass.
 
