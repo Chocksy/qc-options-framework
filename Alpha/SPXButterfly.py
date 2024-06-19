@@ -42,10 +42,10 @@ class SPXButterfly(Base):
         # "profitTarget": 1.0,
         "bidAskSpreadRatio": 0.4,
         "validateBidAskSpread": True,
-        "marketCloseCutoffTime": time(15, 10, 0),
+        "marketCloseCutoffTime": time(16, 10, 0),
         # Put/Call Wing size for Iron Condor, Iron Fly
-        "butterflyLeftWingSize": 50,
-        "butterflyRightWingSize": 50,
+        "butterflyLeftWingSize": 35,
+        "butterflyRightWingSize": 35,
         # "targetPremium": 500,
     }
 
@@ -79,4 +79,5 @@ class SPXButterfly(Base):
             return None
 
         
+
 

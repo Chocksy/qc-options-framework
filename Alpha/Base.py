@@ -206,7 +206,7 @@ class Base(AlphaModel):
         self.logger.debug(f'{self.name} -> update -> start')
         self.logger.debug(f'Is Warming Up: {self.context.IsWarmingUp}')
         self.logger.debug(f'Is Market Open: {self.context.IsMarketOpen(self.underlyingSymbol)}')
-        self.logger.debug(f'Time: {self.context.Time.time()}')
+        self.logger.debug(f'Time: {self.context.Time}')
         # Exit if the algorithm is warming up or the market is closed (avoid processing orders on the last minute as these will be executed the following day)
         if self.context.IsWarmingUp or\
            not self.context.IsMarketOpen(self.underlyingSymbol) or\
@@ -228,7 +228,6 @@ class Base(AlphaModel):
         filteredChain, lastClosedOrderTag = Scanner(self.context, self).Call(data)
 
         self.logger.debug(f'Did Alpha SCAN')
-        self.logger.debug(f'Filtered Chain: {filteredChain}')
         self.logger.debug(f'Last Closed Order Tag: {lastClosedOrderTag}')
         if filteredChain is not None:
             if self.stats.hasOptions == False:
@@ -265,8 +264,13 @@ class Base(AlphaModel):
         context = self.context
 
         order = [order] if not isinstance(order, list) else order
+        for o in order:
+            self.logger.debug(f"CreateInsights -> strategyId: {o['strategyId']}, strikes: {o['strikes']}")
+        
         for single_order in order:
             position, workingOrder = self.buildOrderPosition(single_order, lastClosedOrderTag)
+            self.logger.debug(f"CreateInsights -> position: {position}")
+            self.logger.debug(f"CreateInsights -> workingOrder: {workingOrder}")
             if position is None:
                 continue
             orderId = position.orderId
@@ -282,7 +286,8 @@ class Base(AlphaModel):
 
             # Map each contract to the openPosition dictionary (key: expiryStr)
             context.workingOrders[orderTag] = workingOrder
-
+        
+        self.logger.debug(f"CreateInsights -> insights: {insights}")
         # Stop the timer
         self.context.executionTimer.stop('Alpha.Base -> CreateInsights')
         return insights
@@ -293,6 +298,7 @@ class Base(AlphaModel):
 
         # Get the list of contracts
         contracts = order["contracts"]
+        self.logger.debug(f"buildOrderPosition -> contracts: {len(contracts)}")
         # Exit if there are no contracts
         if (len(contracts) == 0):
             return [None, None]
@@ -321,6 +327,8 @@ class Base(AlphaModel):
         # Expiry String
         expiryStr = expiry.strftime("%Y-%m-%d")
 
+        self.logger.debug(f"buildOrderPosition -> expiry: {expiry}, expiryStr: {expiryStr}")
+
         # Validate the order prior to submit
         if (  # We have a minimum order quantity
                 orderQuantity == 0
@@ -335,6 +343,8 @@ class Base(AlphaModel):
                     self.bidAskSpreadRatio * abs(orderMidPrice))):
             return [None, None]
 
+        self.logger.debug(f"buildOrderPosition -> orderMidPrice: {orderMidPrice}, orderQuantity: {orderQuantity}, maxOrderQuantity: {maxOrderQuantity}")
+
         # Get the current price of the underlying
         underlyingPrice = self.contractUtils.getUnderlyingLastPrice(contracts[0])
 
@@ -344,7 +354,7 @@ class Base(AlphaModel):
         orderTag = f"{strategyId}-{orderId}"
 
         strategyLegs = []
-
+        self.logger.debug(f"buildOrderPosition -> strategyLegs: {strategyLegs}")
         for contract in contracts:
             key = order["contractSideDesc"][contract.Symbol]
             leg = Leg(
@@ -393,6 +403,8 @@ class Base(AlphaModel):
             )
         )
 
+        self.logger.debug(f"buildOrderPosition -> position: {position}")
+
         # Create combo orders by using the provided method instead of always calling MarketOrder.
         insights = []
 
@@ -412,6 +424,8 @@ class Base(AlphaModel):
             )
             insights.append(insight)
 
+        self.logger.debug(f"buildOrderPosition -> insights: {insights}")
+
         # Map each contract to the openPosition dictionary (key: expiryStr)
         workingOrder = WorkingOrder(
             positionKey=orderId,
@@ -424,6 +438,8 @@ class Base(AlphaModel):
             orderType="open",
             fills=0
         )
+
+        self.logger.debug(f"buildOrderPosition -> workingOrder: {workingOrder}")
 
         return [position, workingOrder]
 

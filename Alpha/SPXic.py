@@ -11,9 +11,9 @@ class SPXic(Base):
         # The stop time at which the algorithm will look to open a new position.
         "scheduleStopTime": time(16, 0, 0),
         # Periodic interval with which the algorithm will check to open new positions
-        "scheduleFrequency": timedelta(minutes = 15),
+        "scheduleFrequency": timedelta(minutes = 5),
         # Maximum number of open positions at any given time
-        "maxActivePositions": 30,
+        "maxActivePositions": 10,
         # Control whether to allow multiple positions to be opened for the same Expiration date
         "allowMultipleEntriesPerExpiry": True,
         # Minimum time distance between opening two consecutive trades
@@ -33,10 +33,11 @@ class SPXic(Base):
         "nStrikesLeft": 18,
         "nStrikesRight": 18,
         # TODO fix this and set it based on buying power.
-        "maxOrderQuantity": 1000,
-        "targetPremiumPct": 0.015,
+        "maxOrderQuantity": 10,
+        # COMMENT OUT this one below because it caused the orderQuantity to be 162 and maxOrderQuantity to be 10 so it would not place trades.
+        # "targetPremiumPct": 0.015,
         # Minimum premium accepted for opening a new position. Setting this to None disables it.
-        "minPremium": 1.0,
+        "minPremium": 0.9,
         # Maximum premium accepted for opening a new position. Setting this to None disables it.
         "maxPremium": 1.2,
         # Profit Target Factor (Multiplier of the premium received/paid when the position was opened)
@@ -63,14 +64,20 @@ class SPXic(Base):
 
     def getOrder(self, chain, data):
         self.logger.debug(f"{self.__class__.__name__} -> getOrder -> start")
+        self.logger.debug(f"SPXic -> getOrder -> data.ContainsKey(self.underlyingSymbol): {data.ContainsKey(self.underlyingSymbol)}")
+        self.logger.debug(f"SPXic -> getOrder -> Underlying Symbol: {self.underlyingSymbol}")
         # Best time to open the trade: 9:45 + 10:15 + 12:30 + 13:00 + 13:30 + 13:45 + 14:00 + 15:00 + 15:15 + 15:45
         # https://tradeautomationtoolbox.com/byob-ticks/?save=admZ4dG
         if data.ContainsKey(self.underlyingSymbol):
-            # self.logger.debug(f"SPXic -> getOrder: Data contains key {self.underlyingSymbol}")
+            self.logger.debug(f"SPXic -> getOrder: Data contains key {self.underlyingSymbol}")
             # trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0), time(15, 0, 0), time(15, 15, 0), time(15, 45, 0)]
             # trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0)]
-            trade_times = [time(hour, minute, 0) for hour in range(9, 15) for minute in range(0, 60, 5) if not (hour == 14 and minute > 0)]
-            current_time = self.context.Time.time()
+            trade_times = [time(hour, minute, 0) for hour in range(9, 15) for minute in range(0, 60, 30) if not (hour == 15 and minute > 0)]
+            # Remove the microsecond from the current time
+            current_time = self.context.Time.time().replace(microsecond=0)
+            self.logger.debug(f"SPXic -> getOrder -> current_time: {current_time}")
+            self.logger.debug(f"SPXic -> getOrder -> trade_times: {trade_times}")
+            self.logger.debug(f"SPXic -> getOrder -> current_time in trade_times: {current_time in trade_times}")
             if current_time not in trade_times:
                 return None
             call =  self.order.getSpreadOrder(
@@ -89,8 +96,8 @@ class SPXic(Base):
                 wingSize=self.putWingSize,
                 sell=True
             )
-            # self.logger.debug(f"SPXic -> getOrder: Call: {call}")
-            # self.logger.debug(f"SPXic -> getOrder: Put: {put}")
+            self.logger.debug(f"SPXic -> getOrder: Call: {call}")
+            self.logger.debug(f"SPXic -> getOrder: Put: {put}")
             if call is not None and put is not None:
                 return [call, put]
             else:

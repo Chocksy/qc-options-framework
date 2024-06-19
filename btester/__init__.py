@@ -1,3 +1,6 @@
+#region imports
+from AlgorithmImports import *
+#endregion
 """
 .. moduleauthor:: Paweł Knioła <pawel.kn@gmail.com>
 """

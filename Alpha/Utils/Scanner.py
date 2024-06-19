@@ -33,12 +33,12 @@ class Scanner:
         self.logger.debug(f'Reached max active positions')
         # Get the option chain 
         chain = self.base.dataHandler.getOptionContracts(data)
-        self.logger.debug(f'Chain: {chain}')
+        print(f'Number of contracts in chain: {len(chain) if chain else 0}')
         # Exit if we got no chains
         if chain is None:
             self.logger.debug(" -> No chains inside currentSlice!")
             return None, None
-        self.logger.debug('No chains inside currentSlice')
+        self.logger.debug('We have chains inside currentSlice')
         self.syncExpiryList(chain)
         self.logger.debug(f'Expiry List: {self.expiryList}')
         # Exit if we haven't found any Expiration cycles to process
@@ -48,7 +48,7 @@ class Scanner:
         self.logger.debug('No expirylist')
         # Run the strategy
         filteredChain, lastClosedOrderTag = self.Filter(chain)
-        self.logger.debug(f'Filtered Chain: {filteredChain}')
+        self.logger.debug(f'Filtered Chain Count: {len(filteredChain) if filteredChain else 0}')
         self.logger.debug(f'Last Closed Order Tag: {lastClosedOrderTag}')
         # Stop the timer
         self.context.executionTimer.stop('Alpha.Utils.Scanner -> Call')
@@ -141,7 +141,7 @@ class Scanner:
         if (allowMultipleEntriesPerExpiry or expiryStr not in openPositionsExpiries):
             # Filter the contracts in the chain, keep only the ones expiring on the given date
             filteredChain = self.filterByExpiry(chain, expiry=expiry)
-        self.logger.debug(f'Filtered Chain: {filteredChain}')
+        self.logger.debug(f'Number of items in Filtered Chain: {len(filteredChain) if filteredChain else 0}')
         # Stop the timer
         self.context.executionTimer.stop("Alpha.Utils.Scanner -> Filter")
 
@@ -154,24 +154,32 @@ class Scanner:
     def isWithinScheduledTimeWindow(self) -> bool:
         # Compute the schedule start datetime
         scheduleStartDttm = datetime.combine(self.context.Time.date(), self.base.scheduleStartTime)
+        self.logger.debug(f'Schedule Start Datetime: {scheduleStartDttm}')
 
-        # Exit if we have not reached the the schedule start datetime
+        # Exit if we have not reached the schedule start datetime
         if self.context.Time < scheduleStartDttm:
+            self.logger.debug('Current time is before the schedule start datetime')
             return False
 
         # Check if we have a schedule stop datetime
         if self.base.scheduleStopTime is not None:
             # Compute the schedule stop datetime
             scheduleStopDttm = datetime.combine(self.context.Time.date(), self.base.scheduleStopTime)
+            self.logger.debug(f'Schedule Stop Datetime: {scheduleStopDttm}')
             # Exit if we have exceeded the stop datetime
             if self.context.Time > scheduleStopDttm:
+                self.logger.debug('Current time is after the schedule stop datetime')
                 return False
 
         minutesSinceScheduleStart = round((self.context.Time - scheduleStartDttm).seconds / 60)
+        self.logger.debug(f'Minutes Since Schedule Start: {minutesSinceScheduleStart}')
         scheduleFrequencyMinutes = round(self.base.scheduleFrequency.seconds / 60)
+        self.logger.debug(f'Schedule Frequency Minutes: {scheduleFrequencyMinutes}')
 
         # Exit if we are not at the right scheduled interval
-        return minutesSinceScheduleStart % scheduleFrequencyMinutes == 0
+        isWithinWindow = minutesSinceScheduleStart % scheduleFrequencyMinutes == 0
+        self.logger.debug(f'Is Within Scheduled Time Window: {isWithinWindow}')
+        return isWithinWindow
 
     def hasReachedMaxActivePositions(self) -> bool:
         # Filter openPositions and workingOrders by strategyTag
@@ -235,3 +243,4 @@ class Scanner:
 
         # Return the filtered contracts
         return filteredChain
+

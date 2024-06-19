@@ -59,7 +59,7 @@ class DataHandler:
     # SECTION BELOW HANDLES OPTION CHAIN PROVIDER METHODS
     def optionChainProviderFilter(self, symbols, min_strike_rank, max_strike_rank, minDte, maxDte):
         self.context.executionTimer.start('Tools.DataHandler -> optionChainProviderFilter')
-        self.context.logger.debug(f"optionChainProviderFilter -> symbols: {symbols}")
+        self.context.logger.debug(f"optionChainProviderFilter -> symbols count: {len(symbols)}")
         # Check if we got any symbols to process
         if len(symbols) == 0:
             return None
@@ -68,8 +68,13 @@ class DataHandler:
         filteredSymbols = [symbol for symbol in symbols
                             if minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte
                           ]
+        
 
+        self.context.logger.debug(f"Context Time: {self.context.Time.date()}")
+        unique_dates = set(symbol.ID.Date.date() for symbol in symbols)
+        self.context.logger.debug(f"Unique symbol dates: {unique_dates}")
         self.context.logger.debug(f"optionChainProviderFilter -> filteredSymbols: {filteredSymbols}")
+        
         # Exit if there are no symbols for the selected expiry range
         if not filteredSymbols:
             return None
@@ -144,7 +149,7 @@ class DataHandler:
                 contracts = [
                     contract for contract in chain.Value if minDte <= (contract.Expiry.date() - self.context.Time.date()).days <= maxDte
                 ]
-        self.context.logger.debug(f"getOptionContracts -> contracts: {contracts}")
+        self.context.logger.debug(f"getOptionContracts -> number of contracts: {len(contracts) if contracts else 0}")
         # If no chains were found, use OptionChainProvider to see if we can find any contracts
         # Only do this for short term expiration contracts (DTE < 3) where slice.OptionChains usually fails to retrieve any chains
         # We don't want to do this all the times for performance reasons

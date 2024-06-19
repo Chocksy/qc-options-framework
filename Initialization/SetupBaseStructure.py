@@ -135,6 +135,9 @@ class SetupBaseStructure:
     def CompleteSecurityInitializer(self, security: Security) -> None:
         '''Initialize the security with raw prices'''
         self.context.logger.debug(f"{self.__class__.__name__} -> CompleteSecurityInitializer -> Security: {security}")
+        # override margin requirements
+        security.SetBuyingPowerModel(ConstantBuyingPowerModel(1))
+        
         if self.context.LiveMode:
             return
 
@@ -143,8 +146,6 @@ class SetupBaseStructure:
         security.SetDataNormalizationMode(DataNormalizationMode.Raw)
         security.SetMarketPrice(self.context.GetLastKnownPrice(security))
         # security.SetBuyingPowerModel(AlwaysBuyingPowerModel(self.context))
-        # override margin requirements
-        security.SetBuyingPowerModel(ConstantBuyingPowerModel(1))
 
         if security.Type == SecurityType.Equity:
             # This is for stocks
@@ -295,7 +296,7 @@ class SetupBaseStructure:
             if security.Type == SecurityType.Option:
                 # Check if the option has expired
                 if security.Expiry < self.context.Time:
-                    self.context.logger.trace(f"  >>>  EXPIRED SECURITY-----> Removing expired option contract {security.Symbol} from the algorithm.")
+                    self.context.logger.debug(f"  >>>  EXPIRED SECURITY-----> Removing expired option contract {security.Symbol} from the algorithm.")
                     # Remove the expired option contract
                     self.ClearSecurity(security)
 
@@ -307,7 +308,7 @@ class SetupBaseStructure:
             if any(self.context.Time > leg.expiry for leg in position.legs):
                 # Remove this position from the list of open positions
                 self.context.charting.updateStats(position)
-                self.context.logger.info(f"  >>>  EXPIRED POSITION-----> Removing expired position {position.orderTag} from the algorithm.")
+                self.context.logger.debug(f"  >>>  EXPIRED POSITION-----> Removing expired position {orderTag} from the algorithm.")
                 self.context.openPositions.pop(orderTag)
 
         # Remove the expired positions from the workingOrders dictionary. These are positions that expired
@@ -321,6 +322,7 @@ class SetupBaseStructure:
 
             # Check if we need to cancel the order
             if self.context.Time > execOrder.limitOrderExpiryDttm or any(self.context.Time > leg.expiry for leg in position.legs):
+                self.context.logger.debug(f"  >>>  EXPIRED ORDER-----> Removing expired order {orderTag} from the algorithm.")
                 # Remove this position from the list of open positions
                 if orderTag in self.context.openPositions:
                     self.context.openPositions.pop(orderTag)
@@ -333,3 +335,4 @@ class SetupBaseStructure:
                 # Mark the order as being cancelled
                 position.cancelOrder(self.context, orderType=orderType, message=f"order execution expiration or legs expired")
         self.context.executionTimer.stop()
+

@@ -33,6 +33,9 @@ class LimitOrderHandler:
 
         ticket = None
         orderTransactionIds = execOrder.transactionIds
+        self.logger.debug(f"orderTransactionIds: {orderTransactionIds}")
+        self.logger.debug(f"order.lastRetry: {order.lastRetry}")
+        self.logger.debug(f"self.sinceLastRetry(context, order, timedelta(minutes = 1)): {self.sinceLastRetry(context, order, timedelta(minutes = 1))}")
 
         # Exit if we are not at the right scheduled interval
         if orderTransactionIds and (order.lastRetry is None or self.sinceLastRetry(context, order, timedelta(minutes = 1))):
@@ -115,6 +118,7 @@ class LimitOrderHandler:
                 increment = self.base.adjustmentIncrement if self.base.adjustmentIncrement is not None else 0.05
                 newLimitPrice = round(newLimitPrice / increment) * increment
                 newLimitPrice = round(newLimitPrice, 1)  # Ensure the price is rounded to two decimal places
+                self.logger.info(f"{orderType.upper()} {orderQuantity} {orderTag}, {contract.Symbol}, newLimitPrice: {newLimitPrice}")
 
                 if isComboOrder:
                     legs.append(Leg.Create(contract.Symbol, orderSide, newLimitPrice))

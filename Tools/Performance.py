@@ -26,12 +26,17 @@ class Performance:
             # Convert Symbol instance to string
         symbol_str = str(symbol)
         
+        # Ensure the date is in the tracking dictionary
+        date_key = self.context.Time.date()
+        if date_key not in self.tracking:
+            self.tracking[date_key] = {}
+        
         # Ensure the symbol is in the tracking dictionary
-        if symbol_str not in self.tracking:
-            self.tracking[symbol_str] = {}
+        if symbol_str not in self.tracking[date_key]:
+            self.tracking[date_key][symbol_str] = {}
         
         # Store the day summary
-        self.tracking[self.context.Time.date()][symbol_str] = day_summary
+        self.tracking[date_key][symbol_str] = day_summary
         self.dailyTracking = datetime.now()
         self.tradedToday = False
 

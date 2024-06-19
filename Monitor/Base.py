@@ -64,19 +64,21 @@ class Base(RiskManagementModel):
 
         # Method to allow child classes access to the manageRisk method before any changes are made
         self.preManageRisk()
-        self.context.Log(f"{self.__class__.__name__} -> ManageRisk -> preManageRisk")
+        self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> preManageRisk")
         # Loop through all open positions
         for orderTag, orderId in list(self.context.openPositions.items()):
             # Skip this contract if in the meantime it has been removed by the onOrderEvent
             if orderTag not in self.context.openPositions:
                 continue
-
+            self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions")
             # Get the book position
             bookPosition = self.context.allPositions[orderId]
             # Get the order id
             orderId = bookPosition.orderId
             # Get the order tag
             orderTag = bookPosition.orderTag
+
+            self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId}")
 
             # Check if this is a fully filled position
             if bookPosition.openOrder.filled is False:
@@ -104,6 +106,8 @@ class Base(RiskManagementModel):
                 return []
 
             bookPosition.updatePnLRange(self.context.Time.date(), positionPnL)
+
+            self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId} -> bookPosition: {bookPosition}")
 
             # Special method to monitor the position and handle custom actions on it.
             self.monitorPosition(bookPosition)
@@ -152,6 +156,7 @@ class Base(RiskManagementModel):
                 closeReason.append(customReasons or "It should close from child")
 
             # A custom method to handle
+            self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId} -> shouldCloseFlg: {shouldCloseFlg}, customReasons: {customReasons}")
 
             # Update the stats of each contract
             # TODO: add back this section

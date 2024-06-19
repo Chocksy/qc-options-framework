@@ -357,9 +357,10 @@ class OrderBuilder:
         # Initialize the result and the best premium
         best_spread = []
         best_premium = -float('inf') if premiumOrder == 'max' else float('inf')
-
+        self.logger.debug(f"wingSize: {wingSize}, premiumOrder: {premiumOrder}, fromPrice: {fromPrice}, toPrice: {toPrice}, sortByStrike: {sortByStrike}, strike: {strike}")
         if strike is not None:
             wing = self.getWing(sorted_contracts, wingSize = wingSize)
+            self.logger.debug(f"STRIKE: wing: {wing}")
             # Check if we have any contracts
             if(len(sorted_contracts) > 0):
                 # Add the first leg
@@ -372,9 +373,11 @@ class OrderBuilder:
             for i in range(len(sorted_contracts) - 1):
                 # Get the wing
                 wing = self.getWing(sorted_contracts[i:], wingSize = wingSize)
+                self.logger.debug(f"NO STRIKE: wing: {wing}")
                 if wing is not None:
                     # Calculate the net premium
                     net_premium = abs(self.contractUtils.midPrice(sorted_contracts[i]) - self.contractUtils.midPrice(wing))
+                    self.logger.debug(f"fromPrice: {fromPrice} <= net_premium: {net_premium} <= toPrice: {toPrice}")
                     # Check if the net premium is within the specified price range
                     if fromPrice <= net_premium <= toPrice:
                         # Check if this spread has a better premium

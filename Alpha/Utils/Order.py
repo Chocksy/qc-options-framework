@@ -543,7 +543,10 @@ class Order:
 
         # Get the legs of the spread
         legs = self.strategyBuilder.getSpread(contracts, type, strike = strike, delta = delta, wingSize = wingSize, fromPrice = fromPrice, toPrice = toPrice, premiumOrder = premiumOrder)
-
+        self.logger.debug(f"getSpreadOrder -> legs: {legs}")
+        self.logger.debug(f"getSpreadOrder -> sides: {sides}")
+        self.logger.debug(f"getSpreadOrder -> strategy: {strategy}")
+        self.logger.debug(f"getSpreadOrder -> sell: {sell}")
         # Exit if we couldn't get both legs of the spread
         if len(legs) != 2:
             return
