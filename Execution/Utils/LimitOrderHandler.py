@@ -118,6 +118,7 @@ class LimitOrderHandler:
                 increment = self.base.adjustmentIncrement if self.base.adjustmentIncrement is not None else 0.05
                 newLimitPrice = round(newLimitPrice / increment) * increment
                 newLimitPrice = round(newLimitPrice, 1)  # Ensure the price is rounded to two decimal places
+                newLimitPrice = max(newLimitPrice, increment) # make sure the price is never 0. At least the increment.
                 self.logger.info(f"{orderType.upper()} {orderQuantity} {orderTag}, {contract.Symbol}, newLimitPrice: {newLimitPrice}")
 
                 if isComboOrder:

@@ -135,9 +135,10 @@ class SetupBaseStructure:
     def CompleteSecurityInitializer(self, security: Security) -> None:
         '''Initialize the security with raw prices'''
         self.context.logger.debug(f"{self.__class__.__name__} -> CompleteSecurityInitializer -> Security: {security}")
-        # override margin requirements
-        security.SetBuyingPowerModel(ConstantBuyingPowerModel(1))
         
+        # Disable buying power on the security: https://www.quantconnect.com/docs/v2/writing-algorithms/live-trading/trading-and-orders#10-Disable-Buying-Power
+        security.set_buying_power_model(BuyingPowerModel.NULL)
+
         if self.context.LiveMode:
             return
 
@@ -146,6 +147,8 @@ class SetupBaseStructure:
         security.SetDataNormalizationMode(DataNormalizationMode.Raw)
         security.SetMarketPrice(self.context.GetLastKnownPrice(security))
         # security.SetBuyingPowerModel(AlwaysBuyingPowerModel(self.context))
+        # override margin requirements
+        # security.SetBuyingPowerModel(ConstantBuyingPowerModel(1))
 
         if security.Type == SecurityType.Equity:
             # This is for stocks
@@ -290,13 +293,13 @@ class SetupBaseStructure:
     # for it to stay in check until next day. This will clear that out. Similar method to the monitor one.
     def checkOpenPositions(self):
         self.context.executionTimer.start()
-        # Iterate over all option contracts and remove the expired ones from the 
+        # Iterate over all option contracts and remove the expired ones from the
         for symbol, security in self.context.Securities.items():
             # Check if the security is an option
-            if security.Type == SecurityType.Option:
+            if security.Type == SecurityType.Option and security.HasData:
                 # Check if the option has expired
-                if security.Expiry < self.context.Time:
-                    self.context.logger.debug(f"  >>>  EXPIRED SECURITY-----> Removing expired option contract {security.Symbol} from the algorithm.")
+                if security.Expiry.date() < self.context.Time.date():
+                    self.context.logger.debug(f"  >>>  EXPIRED SECURITY-----> Removing expired {security.Expiry.date()} option contract {security.Symbol} from the algorithm.")
                     # Remove the expired option contract
                     self.ClearSecurity(security)
 
@@ -335,4 +338,5 @@ class SetupBaseStructure:
                 # Mark the order as being cancelled
                 position.cancelOrder(self.context, orderType=orderType, message=f"order execution expiration or legs expired")
         self.context.executionTimer.stop()
+
 

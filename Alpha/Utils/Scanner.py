@@ -26,11 +26,11 @@ class Scanner:
         if not self.isWithinScheduledTimeWindow():
             self.logger.trace(" -> Not within scheduled time window.")
             return None, None
-        self.logger.debug(f'Not within scheduled time window')
+        self.logger.debug(f'Within scheduled time window')
         if self.hasReachedMaxActivePositions():
             self.logger.trace(" -> Already reached max active positions.")
             return None, None
-        self.logger.debug(f'Reached max active positions')
+        self.logger.debug(f'Not max active positions')
         # Get the option chain 
         chain = self.base.dataHandler.getOptionContracts(data)
         print(f'Number of contracts in chain: {len(chain) if chain else 0}')
@@ -45,7 +45,7 @@ class Scanner:
         if not self.expiryList:
             self.logger.trace(" -> No expirylist.")
             return None, None
-        self.logger.debug('No expirylist')
+        self.logger.debug('We have expirylist {self.expiryList}')
         # Run the strategy
         filteredChain, lastClosedOrderTag = self.Filter(chain)
         self.logger.debug(f'Filtered Chain Count: {len(filteredChain) if filteredChain else 0}')
@@ -130,7 +130,7 @@ class Scanner:
             # useFurthestExpiry = False -> expiryListIndex = -1 (takes the last entry -> earliest expiry date since the expiry list is sorted in reverse order)
             expiryListIndex = int(useFurthestExpiry) - 1
             # Get the expiry date
-            expiry = list(self.expiryList.keys())[expiryListIndex]
+            expiry = list(self.expiryList.get(self.context.Time.date()))[expiryListIndex]
         self.logger.debug(f'Expiry: {expiry}')
         # Convert the date to a string
         expiryStr = expiry.strftime("%Y-%m-%d")
@@ -226,7 +226,7 @@ class Scanner:
         if expiry is not None:
             # Filter contracts based on the requested expiry date
             filteredChain = [
-                contract for contract in chain if contract.Expiry.date() == expiry
+                contract for contract in chain if contract.Expiry.date() == expiry.date()
             ]
         else:
             # No filtering
@@ -243,4 +243,5 @@ class Scanner:
 
         # Return the filtered contracts
         return filteredChain
+
 
