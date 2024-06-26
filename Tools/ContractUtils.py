@@ -11,6 +11,7 @@ class ContractUtils:
         self.context = context
         # Set the logger
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
+        
 
     def getUnderlyingPrice(self, symbol):
         security = self.context.Securities[symbol]
@@ -48,6 +49,15 @@ class ContractUtils:
         security = self.getSecurity(contract)
         return 0.5 * (security.BidPrice + security.AskPrice)
     
+    # Returns the mid-price of an option contract
+    def strikePrice(self, contract):
+        security = self.getSecurity(contract)
+        return security.symbol.ID.StrikePrice
+    
+    def expiryDate(self, contract):
+        security = self.getSecurity(contract)
+        return security.symbol.ID.Date
+    
     def volume(self, contract):
         security = self.getSecurity(contract)
         return security.Volume
@@ -58,7 +68,7 @@ class ContractUtils:
     
     def delta(self, contract):
         security = self.getSecurity(contract)
-        return security.Delta
+        return security.delta
     
     def gamma(self, contract):
         security = self.getSecurity(contract)
