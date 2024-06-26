@@ -30,15 +30,15 @@ class CCModel(Base):
         # Coarse filter for the Universe selection. It selects nStrikes on both sides of the ATM
         # strike for each available expiration
         # Example: 200 SPX @ 3820 & 3910C w delta @ 1.95 => 90/5 = 18
-        "nStrikesLeft": 18,
-        "nStrikesRight": 18,
+        "nStrikesLeft": 35,
+        "nStrikesRight": 35,
         # TODO fix this and set it based on buying power.
         "maxOrderQuantity": 25,
         "targetPremiumPct": 0.015,
         # Minimum premium accepted for opening a new position. Setting this to None disables it.
         "minPremium": 0.25,
         # Maximum premium accepted for opening a new position. Setting this to None disables it.
-        "maxPremium": 0.5,
+        "maxPremium": 0.8,
         # Profit Target Factor (Multiplier of the premium received/paid when the position was opened)
         "profitTarget": 0.4,
         "bidAskSpreadRatio": 0.4,
@@ -54,26 +54,27 @@ class CCModel(Base):
         # You can change the name here
         self.name = "CCModel"
         self.nameTag = "CCModel"
-        self.ticker = "SPY"
+        self.ticker = "TSLA"
         self.context.structure.AddUnderlying(self, self.ticker)
 
     def getOrder(self, chain, data):
         if data.ContainsKey(self.underlyingSymbol):
+            self.logger.debug(f"CCModel -> getOrder: Data contains key {self.underlyingSymbol}")
             # Based on maxActivePositions set to 1. We should already check if there is an open position or
             # working order. If there is, then this will not even run.
             call =  self.order.getNakedOrder(
                 chain,
                 'call',
-                fromPrice = self.minPremium, 
+                fromPrice = self.minPremium,
                 toPrice = self.maxPremium,
                 sell=True
             )
+            self.logger.debug(f"CCModel -> getOrder: Call: {call}")
             if call is not None:
-                return call
+                return [call]
             else:
                 return None
         else:
             return None
 
-        
 

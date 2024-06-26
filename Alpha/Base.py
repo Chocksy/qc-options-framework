@@ -51,6 +51,8 @@ class Base(AlphaModel):
         "scheduleFrequency": timedelta(minutes=5),
         # Minimum time distance between opening two consecutive trades
         "minimumTradeScheduleDistance": timedelta(days=1),
+        # If True, the order is not placed if the legs are already part of an existing position.
+        "checkForDuplicatePositions": True,
         # Maximum number of open positions at any given time
         "maxActivePositions": 1,
         # Maximum quantity used to scale each position. If the target premium cannot be reached within this
@@ -266,13 +268,18 @@ class Base(AlphaModel):
         order = [order] if not isinstance(order, list) else order
         for o in order:
             self.logger.debug(f"CreateInsights -> strategyId: {o['strategyId']}, strikes: {o['strikes']}")
-        
+
         for single_order in order:
             position, workingOrder = self.buildOrderPosition(single_order, lastClosedOrderTag)
             self.logger.debug(f"CreateInsights -> position: {position}")
             self.logger.debug(f"CreateInsights -> workingOrder: {workingOrder}")
             if position is None:
                 continue
+
+            if self.hasDuplicateLegs(single_order):
+                self.logger.debug(f"CreateInsights -> Duplicate legs found in order: {single_order}")
+                continue
+
             orderId = position.orderId
             orderTag = position.orderTag
             insights.extend(workingOrder.insights)
@@ -286,7 +293,7 @@ class Base(AlphaModel):
 
             # Map each contract to the openPosition dictionary (key: expiryStr)
             context.workingOrders[orderTag] = workingOrder
-        
+
         self.logger.debug(f"CreateInsights -> insights: {insights}")
         # Stop the timer
         self.context.executionTimer.stop('Alpha.Base -> CreateInsights')
@@ -442,6 +449,40 @@ class Base(AlphaModel):
         self.logger.debug(f"buildOrderPosition -> workingOrder: {workingOrder}")
 
         return [position, workingOrder]
+
+    def hasDuplicateLegs(self, order):
+        # Check if checkForDuplicatePositions is enabled
+        if not self.checkForDuplicatePositions:
+            return False
+
+        # Get the context
+        context = self.context
+
+        # Get the list of contracts
+        contracts = order["contracts"]
+
+        openPositions = context.openPositions
+
+        # Iterate through open positions
+        for orderTag, orderId in list(openPositions.items()):
+            position = context.allPositions[orderId]
+
+            # Check if the expiry matches
+            if position.expiryStr != order["expiry"].strftime("%Y-%m-%d"):
+                continue
+
+            # Check if the strategy matches (if allowMultipleEntriesPerExpiry is False)
+            if not self.allowMultipleEntriesPerExpiry and position.strategyId == order["strategyId"]:
+                return True
+
+            # Compare legs
+            position_legs = set((leg.strike, leg.contractSide) for leg in position.legs)
+            order_legs = set((contract.Strike, order["contractSide"][contract.Symbol]) for contract in contracts)
+
+            if position_legs == order_legs:
+                return True
+
+        return False
 
     """
     This method is called every minute to update the stats dictionary.
