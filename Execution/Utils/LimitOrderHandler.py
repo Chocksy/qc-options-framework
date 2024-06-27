@@ -116,7 +116,7 @@ class LimitOrderHandler:
                 # round the price or we get an error like:
                 # Adjust the limit price to meet brokerage precision requirements
                 increment = self.base.adjustmentIncrement if self.base.adjustmentIncrement is not None else 0.05
-                newLimitPrice = round(newLimitPrice / increment) * increment
+                newLimitPrice = round(newLimitPrice / increment) * increment if increment > 0 else newLimitPrice
                 newLimitPrice = round(newLimitPrice, 1)  # Ensure the price is rounded to two decimal places
                 newLimitPrice = max(newLimitPrice, increment) # make sure the price is never 0. At least the increment.
                 self.logger.info(f"{orderType.upper()} {orderQuantity} {orderTag}, {contract.Symbol}, newLimitPrice: {newLimitPrice}")
@@ -198,7 +198,7 @@ class LimitOrderHandler:
             target_price = min_price
 
         # Round the target price to the nearest multiple of adjustmentIncrement
-        target_price = round(target_price / step) * step
+        target_price = round(target_price / step) * step if step > 0 else target_price
 
         # Calculate the adjustment value
         adjustment_value = (target_price - execOrder.midPrice) / nrContracts
