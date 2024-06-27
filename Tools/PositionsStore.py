@@ -6,7 +6,7 @@ import pickle
 import importlib
 from dataclasses import asdict, is_dataclass, fields
 from datetime import datetime, date, time
-from Strategy.Position import Position, Leg, OrderType, Order, WorkingOrder
+from Strategy.Position import Position, Leg, OrderType, WorkingOrder
 
 class PositionEncoder(json.JSONEncoder):
     def default(self, obj):

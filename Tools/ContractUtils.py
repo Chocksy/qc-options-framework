@@ -90,6 +90,7 @@ class ContractUtils:
         """
         # Get the context
         context = self.context
+        security = None
         # Get the object from the Securities dictionary if available (pull the latest price), else use the contract object itself
         if contract.UnderlyingSymbol in context.Securities:
             security = context.Securities[contract.UnderlyingSymbol]
