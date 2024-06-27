@@ -54,8 +54,8 @@ class Base(RiskManagementModel):
         risk_check_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0), time(15, 0, 0), time(15, 15, 0), time(15, 45, 0)]
         current_time = self.context.time.time()
         if current_time not in risk_check_times:
-            return None
-            
+            return []
+
         # Start the timer
         self.context.executionTimer.start('Monitor.Base -> ManageRisk')
         # We are basically ignoring the current portfolio targets to be assessed for risk
