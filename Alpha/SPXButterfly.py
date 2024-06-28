@@ -80,4 +80,3 @@ class SPXButterfly(Base):
 
         
 
-
