@@ -339,4 +339,3 @@ class SetupBaseStructure:
                 position.cancelOrder(self.context, orderType=orderType, message=f"order execution expiration or legs expired")
         self.context.executionTimer.stop()
 
-

@@ -18,7 +18,7 @@ class Scanner:
     def Call(self, data) -> [Dict, str]:
         # Start the timer
         self.context.executionTimer.start('Alpha.Utils.Scanner -> Call')
-        self.logger.debug(f'{self.base.name} -> Call -> start')
+        self.logger.trace(f'{self.base.name} -> Call -> start')
         if self.isMarketClosed():
             self.logger.trace(" -> Market is closed.")
             return None, None
@@ -45,7 +45,7 @@ class Scanner:
         if not self.expiryList:
             self.logger.trace(" -> No expirylist.")
             return None, None
-        self.logger.debug('We have expirylist {self.expiryList}')
+        self.logger.debug(f'We have expirylist {self.expiryList}')
         # Run the strategy
         filteredChain, lastClosedOrderTag = self.Filter(chain)
         self.logger.debug(f'Filtered Chain Count: {len(filteredChain) if filteredChain else 0}')
