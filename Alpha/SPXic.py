@@ -43,7 +43,7 @@ class SPXic(Base):
         # Profit Target Factor (Multiplier of the premium received/paid when the position was opened)
         "profitTarget": 1.0,
         "bidAskSpreadRatio": 0.4,
-        "validateBidAskSpread": True,
+        "validateBidAskSpread": False,
         "marketCloseCutoffTime": None, #time(15, 45, 0),
         # Put/Call Wing size for Iron Condor, Iron Fly
         "putWingSize": 10,
