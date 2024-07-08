@@ -53,6 +53,8 @@ class Base(AlphaModel):
         "minimumTradeScheduleDistance": timedelta(minutes=15),
         # If True, the order is not placed if the legs are already part of an existing position.
         "checkForDuplicatePositions": True,
+        # If True, the order is not placed if even one leg is in an existing position.
+        "checkForOneDuplicateLeg": True,
         # Maximum number of open positions at any given time
         "maxActivePositions": 1,
         # Maximum quantity used to scale each position. If the target premium cannot be reached within this
@@ -411,6 +413,7 @@ class Base(AlphaModel):
         )
 
         self.logger.debug(f"buildOrderPosition -> position: {position}")
+        
 
         # Create combo orders by using the provided method instead of always calling MarketOrder.
         insights = []
@@ -430,11 +433,6 @@ class Base(AlphaModel):
                 position.openOrder.limitOrderExpiryDttm,
                 InsightDirection.Down if orderSide == -1 else InsightDirection.Up
             )
-
-            # clear all the securities if there is no position and is past their dteWindow (to reduce the api calls for contracts we do not request again) 
-            if not self.NotExpiredOrPosition(contract):
-                self.context.debug("clearing: " + str(self.context.Time) + ":" + str(self.dte - self.clrWindow) + ":" + str(contract.symbol))
-                self.context.structure.ClearSecurity(contract)
 
             insights.append(insight)
 
@@ -457,13 +455,16 @@ class Base(AlphaModel):
 
         return [position, workingOrder]
 
-    def NotExpiredOrPosition(self, contract):
-        
+    def hasOneDuplicateLegs(self, order):
+        # Check if checkForDuplicatePositions is enabled
+        if not self.checkForOneDuplicateLeg:
+            return False
+
         # Get the context
         context = self.context
 
-        if contract.Expiry + timedelta(days=1) < context.time:
-            return False
+        # Get the list of contracts
+        contracts = order["contracts"]
 
         openPositions = context.openPositions
 
@@ -471,13 +472,20 @@ class Base(AlphaModel):
         for orderTag, orderId in list(openPositions.items()):
             position = context.allPositions[orderId]
 
-            for leg in position.legs:
-                if leg.symbol == contract.symbol:
-                    return True
+            # Check if the expiry matches
+            if position.expiryStr != order["expiry"].strftime("%Y-%m-%d"):
+                continue
 
-        if (self.dte - self.dteWindow) <= (contract.expiry - context.time).days:
-            return True
-            
+            # Check if the strategy matches (if allowMultipleEntriesPerExpiry is False)
+            if not self.allowMultipleEntriesPerExpiry and position.strategyId == order["strategyId"]:
+                return True
+
+            # Compare legs
+            for leg in position.legs:
+                for contract in contracts:
+                    if leg.strike == contract.strike:
+                        return True
+
         return False
 
 
