@@ -455,7 +455,7 @@ class Base(AlphaModel):
 
         return [position, workingOrder]
 
-    def hasOneDuplicateLegs(self, order):
+    def hasOneDuplicateLeg(self, order):
         # Check if checkForDuplicatePositions is enabled
         if not self.checkForOneDuplicateLeg:
             return False
