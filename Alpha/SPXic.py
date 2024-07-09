@@ -35,7 +35,7 @@ class SPXic(Base):
         # TODO fix this and set it based on buying power.
         # "maxOrderQuantity": 200,
         # COMMENT OUT this one below because it caused the orderQuantity to be 162 and maxOrderQuantity to be 10 so it would not place trades.
-        "targetPremiumPct": 0.005,
+        "targetPremiumPct": 0.01,
         "validateQuantity": False,
         # Minimum premium accepted for opening a new position. Setting this to None disables it.
         "minPremium": 0.9,
@@ -45,7 +45,7 @@ class SPXic(Base):
         "profitTarget": 1.0,
         "bidAskSpreadRatio": 0.4,
         "validateBidAskSpread": True,
-        "marketCloseCutoffTime": None, #time(15, 45, 0),
+        "marketCloseCutoffTime": time(15, 45, 0),
         # Put/Call Wing size for Iron Condor, Iron Fly
         "putWingSize": 10,
         "callWingSize": 10,

@@ -6,7 +6,7 @@ from Tools import ContractUtils, Logger, Underlying
 
 
 # Your New Python File
-class LimitOrderHandler:
+class LimitOrderHandlerWithCombo:
     def __init__(self, context, base):
         self.context = context
         self.contractUtils = ContractUtils(context)
@@ -85,7 +85,7 @@ class LimitOrderHandler:
                 legs.append(Leg.Create(contract.Symbol, orderSide))
 
         # Calculate the new limit price
-        newLimitPrice = self.calculateNewLimitPrice(execOrder, limitOrderPrice, order.fillRetries, len(contracts), orderType)
+        newLimitPrice = self.calculateNewLimitPrice(position, execOrder, limitOrderPrice, order.fillRetries, len(contracts), orderType)
 
         # Log the parameters used to validate the order
         self.logOrderDetails(position, order)
@@ -109,7 +109,7 @@ class LimitOrderHandler:
 
         # Calculate the new limit price
         limitOrderPrice = self.limitOrderPrice(order)
-        newLimitPrice = self.calculateNewLimitPrice(execOrder, limitOrderPrice, order.fillRetries, len(position.legs), orderType)
+        newLimitPrice = self.calculateNewLimitPrice(position, execOrder, limitOrderPrice, order.fillRetries, len(position.legs), orderType)
 
         # Get the first order ticket (we only need to update one for the combo order)
         ticket = context.Transactions.GetOrderTicket(orderTransactionIds[0])
@@ -125,17 +125,13 @@ class LimitOrderHandler:
                 self.logger.warning(f"Failed to update combo order: {response.ErrorCode}")
 
         # Log the update
-        log_message = f"UPDATED {orderType.upper()} {position.orderQuantity} {position.orderTag}, "
-        log_message += f"New Limit: {round(newLimitPrice, 2)}, "
-        log_message += f"Old Mid: {round(execOrder.midPrice, 2)}, "
-        log_message += f"Adjustment: {round(newLimitPrice - execOrder.midPrice, 2)}"
-        self.logger.info(log_message)
+        self.logOrderExecution(position, order, newLimitPrice, action="UPDATED")
 
         # Update order information
         order.lastRetry = context.Time
         order.fillRetries += 1  # increment the number of fill tries
 
-    def calculateNewLimitPrice(self, execOrder, limitOrderPrice, retries, nrContracts, orderType):
+    def calculateNewLimitPrice(self, position, execOrder, limitOrderPrice, retries, nrContracts, orderType):
         if orderType == "close":
             adjustmentValue = self.calculateAdjustmentValueBought(
                 execOrder=execOrder,
@@ -151,13 +147,26 @@ class LimitOrderHandler:
                 nrContracts=nrContracts
             )
 
-        newLimitPrice = execOrder.midPrice + adjustmentValue if orderType == "open" else execOrder.midPrice - adjustmentValue
+        # Determine if it's a credit or debit strategy
+        isCredit = position.isCreditStrategy
+
+        if isCredit:
+            # For credit strategies, we want to receive at least this much (negative value)
+            newLimitPrice = -(abs(execOrder.midPrice) - adjustmentValue) if orderType == "open" else -(abs(execOrder.midPrice) + adjustmentValue)
+        else:
+            # For debit strategies, we're willing to pay up to this much (positive value)
+            newLimitPrice = execOrder.midPrice + adjustmentValue if orderType == "open" else execOrder.midPrice - adjustmentValue
 
         # Adjust the limit price to meet brokerage precision requirements
         increment = self.base.adjustmentIncrement if self.base.adjustmentIncrement is not None else 0.05
         newLimitPrice = round(newLimitPrice / increment) * increment
         newLimitPrice = round(newLimitPrice, 2)  # Ensure the price is rounded to two decimal places
-        newLimitPrice = max(newLimitPrice, increment)  # make sure the price is never 0. At least the increment.
+
+        # Ensure the price is never 0 and maintains the correct sign
+        if isCredit:
+            newLimitPrice = min(newLimitPrice, -increment)
+        else:
+            newLimitPrice = max(newLimitPrice, increment)
 
         return newLimitPrice
 
@@ -175,12 +184,14 @@ class LimitOrderHandler:
         self.logger.debug(f" - midPrice: {execOrder.midPrice}  (limitOrderPrice: {self.limitOrderPrice(order)})")
         self.logger.debug(f" - bidAskSpread: {execOrder.bidAskSpread}")
 
-    def logOrderExecution(self, position, order, newLimitPrice):
+    def logOrderExecution(self, position, order, newLimitPrice, action=None):
         orderType = order.orderType
         execOrder = position[f"{orderType}Order"]
         contracts = [v.contract for v in position.legs]
 
-        log_message = f"{orderType.upper()} {position.orderQuantity} {position.orderTag}, "
+        action = action or orderType.upper()
+
+        log_message = f"{action} {position.orderQuantity} {position.orderTag}, "
         log_message += f"{[c.Strike for c in contracts]} @ Mid: {round(execOrder.midPrice, 2)}, "
         log_message += f"NewLimit: {round(newLimitPrice, 2)}, "
         log_message += f"Limit: {round(self.limitOrderPrice(order), 2)}, "
