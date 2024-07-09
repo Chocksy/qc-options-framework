@@ -1,7 +1,7 @@
 from AlgorithmImports import *
 
 from Tools import ContractUtils, Logger
-from Execution.Utils import MarketOrderHandler, LimitOrderHandler
+from Execution.Utils import MarketOrderHandler, LimitOrderHandler, LimitOrderHandlerWithCombo
 """
 """
 
@@ -49,7 +49,8 @@ class Base(ExecutionModel):
         # Set the logger
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
         self.marketOrderHandler = MarketOrderHandler(context, self)
-        self.limitOrderHandler = LimitOrderHandler(context, self)
+        # self.limitOrderHandler = LimitOrderHandler(context, self)
+        self.limitOrderHandler = LimitOrderHandlerWithCombo(context, self)
         self.logger.debug(f"{self.__class__.__name__} -> __init__")
         # Gets or sets the maximum spread compare to current price in percentage.
         # self.acceptingSpreadPercent = Math.Abs(acceptingSpreadPercent)
