@@ -55,7 +55,7 @@ class _ParentBase:
 
         nodef_f_repr = ", ".join(f"{name}={value}" for name, value in nodef_f_vals)
         return f"{self.__class__.__name__}({nodef_f_repr})"
-    
+
     # recursive method that checks the fields of each dataclass and calls asdict if we have another dataclass referenced
     # otherwise it just builds a dictionary and assigns the values and keys.
     def asdict(self):
@@ -109,15 +109,15 @@ class Leg(_ParentBase):
     @property
     def isCall(self):
         return self.contract.Right == OptionRight.Call
-    
+
     @property
     def isPut(self):
         return self.contract.Right == OptionRight.Put
-    
+
     @property
     def isSold(self):
         return self.contractSide == -1
-    
+
     @property
     def isBought(self):
         return self.contractSide == 1
@@ -253,7 +253,7 @@ class Position(_ParentBase):
     @property
     def isCreditStrategy(self):
         return self.strategyId in ["PutCreditSpread", "CallCreditSpread", "IronCondor", "IronFly", "CreditButterfly", "ShortStrangle", "ShortStraddle", "ShortCall", "ShortPut"]
-    
+
     @property
     def isDebitStrategy(self):
         return self.strategyId in ["DebitButterfly", "ReverseIronFly", "ReverseIronCondor", "CallDebitSpread", "PutDebitSpread", "LongStrangle", "LongStraddle", "LongCall", "LongPut"]
@@ -452,4 +452,4 @@ class Position(_ParentBase):
         for id in orderTransactionIds:
             context.logger.info(f"Canceling order: {id}")
             ticket = context.Transactions.GetOrderTicket(id)
-            ticket.Cancel(f"Cancelled trade: {message}")
+            ticket.Cancel()
