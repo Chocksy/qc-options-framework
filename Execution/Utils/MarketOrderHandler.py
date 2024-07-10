@@ -25,13 +25,18 @@ class MarketOrderHandler:
         orderType = order.orderType
         contracts = [v.contract for v in position.legs]
         orderSides = [v.contractSide for v in position.legs]
-        # orderSides = np.array([c.contractSide for c in position.legs])
         bidAskSpread = sum(list(map(self.contractUtils.bidAskSpread, contracts)))
         midPrice = sum(side * self.contractUtils.midPrice(contract) for side, contract in zip(orderSides, contracts))
         underlying = Underlying(context, position.underlyingSymbol())
         orderSign = 2 * int(orderType == "open") - 1
         execOrder = position[f"{orderType}Order"]
         execOrder.midPrice = midPrice
+
+        # Check if the order already has transaction IDs
+        orderTransactionIds = execOrder.transactionIds
+        if orderTransactionIds:
+            self.logger.debug(f"Market order already placed. Waiting for execution. Transaction IDs: {orderTransactionIds}")
+            return
 
         # This updates prices and stats for the order
         position.updateOrderStats(context, orderType)
@@ -93,18 +98,20 @@ class MarketOrderHandler:
         self.logger.debug(f" - midPrice: {midPrice}")
         self.logger.debug(f" - bidAskSpread: {bidAskSpread}")
 
-        # Execute only if we have multiple legs (sides) per order
+        # Execute only if we have multiple legs (sides) per order and no existing transaction IDs
         if (
             len(legs) > 0
+            and not orderTransactionIds
             # Validate the bid-ask spread to make sure it's not too wide
             and not (position.strategyParam("validateBidAskSpread") and abs(bidAskSpread) > position.strategyParam("bidAskSpreadRatio")*abs(midPrice))
         ):
-            context.ComboMarketOrder(
+            order_result = context.ComboMarketOrder(
                 legs,
                 orderQuantity,
                 asynchronous=True,
                 tag=orderTag
             )
+            execOrder.transactionIds = [t.OrderId for t in order_result]
 
         # Stop the timer
         self.context.executionTimer.stop()
