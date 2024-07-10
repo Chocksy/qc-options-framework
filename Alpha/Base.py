@@ -50,9 +50,11 @@ class Base(AlphaModel):
         # Periodic interval with which the algorithm will check to open new positions
         "scheduleFrequency": timedelta(minutes=5),
         # Minimum time distance between opening two consecutive trades
-        "minimumTradeScheduleDistance": timedelta(days=1),
+        "minimumTradeScheduleDistance": timedelta(minutes=15),
         # If True, the order is not placed if the legs are already part of an existing position.
         "checkForDuplicatePositions": True,
+        # If True, the order is not placed if even one leg is in an existing position.
+        "checkForOneDuplicateLeg": True,
         # Maximum number of open positions at any given time
         "maxActivePositions": 1,
         # Maximum quantity used to scale each position. If the target premium cannot be reached within this
@@ -102,12 +104,12 @@ class Base(AlphaModel):
         # The frequency (in minutes) with which the leg details are updated (used only if includeLegDetails = True)
         "legDatailsUpdateFrequency": 30,
         # Controls whether to track the details on each leg across the life of the trade
-        "trackLegDetails": False,
+        "trackLegDetails": True,
         # Controls which greeks are included in the output log
         # "greeksIncluded": ["Delta", "Gamma", "Vega", "Theta", "Rho", "Vomma", "Elasticity"],
-        "greeksIncluded": [],
+        "greeksIncluded": ["Delta"],
         # Controls whether to compute the greeks for the strategy. If True, the greeks will be computed and stored in the contract under BSMGreeks.
-        "computeGreeks": False,
+        "computeGreeks": True,
         # The time (on expiration day) at which any position that is still open will closed
         "marketCloseCutoffTime": time(15, 45, 0),
         # Limit Order Management
@@ -279,7 +281,7 @@ class Base(AlphaModel):
             if self.hasDuplicateLegs(single_order):
                 self.logger.debug(f"CreateInsights -> Duplicate legs found in order: {single_order}")
                 continue
-
+                
             orderId = position.orderId
             orderTag = position.orderTag
             insights.extend(workingOrder.insights)
@@ -411,12 +413,14 @@ class Base(AlphaModel):
         )
 
         self.logger.debug(f"buildOrderPosition -> position: {position}")
+        
 
         # Create combo orders by using the provided method instead of always calling MarketOrder.
         insights = []
 
         # Create the orders
         for contract in contracts:
+
             # Subscribe to the option contract data feed
             if contract.Symbol not in context.optionContractsSubscriptions:
                 context.AddOptionContract(contract.Symbol, context.timeResolution)
@@ -429,6 +433,7 @@ class Base(AlphaModel):
                 position.openOrder.limitOrderExpiryDttm,
                 InsightDirection.Down if orderSide == -1 else InsightDirection.Up
             )
+
             insights.append(insight)
 
         self.logger.debug(f"buildOrderPosition -> insights: {insights}")
@@ -449,6 +454,40 @@ class Base(AlphaModel):
         self.logger.debug(f"buildOrderPosition -> workingOrder: {workingOrder}")
 
         return [position, workingOrder]
+
+    def hasOneDuplicateLeg(self, order):
+        # Check if checkForDuplicatePositions is enabled
+        if not self.checkForOneDuplicateLeg:
+            return False
+
+        # Get the context
+        context = self.context
+
+        # Get the list of contracts
+        contracts = order["contracts"]
+
+        openPositions = context.openPositions
+
+        # Iterate through open positions
+        for orderTag, orderId in list(openPositions.items()):
+            position = context.allPositions[orderId]
+
+            # Check if the expiry matches
+            if position.expiryStr != order["expiry"].strftime("%Y-%m-%d"):
+                continue
+
+            # Check if the strategy matches (if allowMultipleEntriesPerExpiry is False)
+            if not self.allowMultipleEntriesPerExpiry and position.strategyId == order["strategyId"]:
+                return True
+
+            # Compare legs
+            for leg in position.legs:
+                for contract in contracts:
+                    if leg.strike == contract.strike:
+                        return True
+
+        return False
+
 
     def hasDuplicateLegs(self, order):
         # Check if checkForDuplicatePositions is enabled

@@ -101,8 +101,9 @@ class CentralAlgorithm(QCAlgorithm):
     def OnSecuritiesChanged(self, changes):
         for security in changes.AddedSecurities:
             self.structure.CompleteSecurityInitializer(security)
-        for security in changes.RemovedSecurities:
-            self.structure.ClearSecurity(security)
+        # for security in changes.RemovedSecurities:
+            # disabling the clear security here as it results in positions closing early and manually controlling it in Alpha/Base.py 
+            # self.structure.ClearSecurity(security)
 
     def OnEndOfDay(self, symbol):
         self.structure.checkOpenPositions()

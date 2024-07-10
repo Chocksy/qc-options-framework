@@ -452,4 +452,7 @@ class Position(_ParentBase):
         for id in orderTransactionIds:
             context.logger.info(f"Canceling order: {id}")
             ticket = context.Transactions.GetOrderTicket(id)
-            ticket.Cancel()
+            
+            if ticket:
+                ticket.Cancel()
+

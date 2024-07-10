@@ -46,7 +46,8 @@ class LimitOrderHandler:
             """
             for id in orderTransactionIds:
                 ticket = context.Transactions.GetOrderTicket(id)
-                ticket.Cancel('Cancelled trade and trying with new prices')
+                if ticket:
+                    ticket.Cancel('Cancelled trade and trying with new prices')
             # store when we last canceled/retried and check with current time if like 2-3 minutes passed before we retry again.
             self.makeLimitOrder(position, order, retry = True)
             # NOTE: If combo limit orders will execute limit orders instead of market orders then let's use this method.
