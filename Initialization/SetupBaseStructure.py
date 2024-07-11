@@ -214,20 +214,25 @@ class SetupBaseStructure:
         # Add the underlying and the option chain to the algorithm
         strategy.dataHandler = DataHandler(self.context, ticker, strategy)
         underlying = strategy.dataHandler.AddUnderlying(self.context.timeResolution)
-        option = strategy.dataHandler.AddOptionsChain(underlying, self.context.timeResolution)
         # Set data normalization mode to Raw
         underlying.SetDataNormalizationMode(DataNormalizationMode.Raw)
         self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Underlying: {underlying}")
         # Keep track of the option contract subscriptions
         self.context.optionContractsSubscriptions = []
 
-        # Set the option chain filter function
-        option.SetFilter(strategy.dataHandler.SetOptionFilter)
-        self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Option: {option}")
         # Store the symbol for the option and the underlying
         strategy.underlyingSymbol = underlying.Symbol
-        strategy.optionSymbol = option.Symbol
-
+        
+        # REGION FOR USING SLICE INSTEAD OF PROVIDER
+        if strategy.useSlice:
+            option = strategy.dataHandler.AddOptionsChain(underlying, self.context.timeResolution)
+            # Set the option chain filter function
+            option.SetFilter(strategy.dataHandler.SetOptionFilter)
+            self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Option: {option}")
+            strategy.optionSymbol = option.Symbol
+        else:
+            strategy.optionSymbol = None
+        
         # Set the benchmark.
         self.context.SetBenchmark(underlying.Symbol)
         self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Benchmark: {self.context.Benchmark}")
@@ -338,5 +343,4 @@ class SetupBaseStructure:
                 # Mark the order as being cancelled
                 position.cancelOrder(self.context, orderType=orderType, message=f"order execution expiration or legs expired")
         self.context.executionTimer.stop()
-
 
