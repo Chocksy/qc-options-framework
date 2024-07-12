@@ -133,7 +133,7 @@ class DataHandler:
         self.context.logger.debug(f"getOptionContracts -> minDte: {minDte}")
         self.context.logger.debug(f"getOptionContracts -> maxDte: {maxDte}")
 
-        if slice:
+        if self.strategy.useSlice:
             for chain in slice.OptionChains:
                 if self.strategy.optionSymbol == None or chain.Key != self.strategy.optionSymbol:
                     continue

@@ -6,6 +6,7 @@ from datetime import datetime
 
 class ProviderOptionContract:
     def __init__(self, symbol, underlying_price, context):
+        self.symbol = symbol
         self.Symbol = symbol
         self.Underlying = symbol.Underlying
         self.UnderlyingSymbol = symbol.Underlying
@@ -36,5 +37,13 @@ class ProviderOptionContract:
     @property
     def LastPrice(self):
         return self.security.Price
+
+    @property
+    def IsTradable(self):
+        return self.security.IsTradable
+
+    @property
+    def OpenInterest(self):
+        return self.security.OpenInterest
 
     # Add any other properties or methods you commonly use from OptionContract
