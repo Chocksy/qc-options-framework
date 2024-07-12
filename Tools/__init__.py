@@ -9,5 +9,6 @@ from .BSMLibrary import BSM, BSMGreeks
 from .Helper import Helper
 from .Charting import Charting
 from .Performance import Performance
+from .ProviderOptionContract import ProviderOptionContract
 #endregion
 

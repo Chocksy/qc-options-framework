@@ -3,6 +3,7 @@ from AlgorithmImports import *
 #endregion
 
 from .Underlying import Underlying
+from .ProviderOptionContract import ProviderOptionContract
 import operator
 
 class DataHandler:
@@ -60,106 +61,92 @@ class DataHandler:
     def optionChainProviderFilter(self, symbols, min_strike_rank, max_strike_rank, minDte, maxDte):
         self.context.executionTimer.start('Tools.DataHandler -> optionChainProviderFilter')
         self.context.logger.debug(f"optionChainProviderFilter -> symbols count: {len(symbols)}")
-        # Check if we got any symbols to process
+        
         if len(symbols) == 0:
+            self.context.logger.warning("No symbols provided to optionChainProviderFilter")
             return None
 
-        # Filter the symbols based on the expiry range
         filteredSymbols = [symbol for symbol in symbols
-                            if minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte
-                          ]
-        
+                            if minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte]
 
+        self.context.logger.debug(f"Filtered symbols count: {len(filteredSymbols)}")
         self.context.logger.debug(f"Context Time: {self.context.Time.date()}")
         unique_dates = set(symbol.ID.Date.date() for symbol in symbols)
         self.context.logger.debug(f"Unique symbol dates: {unique_dates}")
         self.context.logger.debug(f"optionChainProviderFilter -> filteredSymbols: {filteredSymbols}")
         
-        # Exit if there are no symbols for the selected expiry range
         if not filteredSymbols:
+            self.context.logger.warning("No symbols left after date filtering")
             return None
 
-        # If this is not a cash ticker, filter out any non-tradable symbols.
-        # to escape the error `Backtest Handled Error: The security with symbol 'SPY 220216P00425000' is marked as non-tradable.`
         if not self.__CashTicker():
             filteredSymbols = [x for x in filteredSymbols if self.context.Securities[x.ID.Symbol].IsTradable]
+            self.context.logger.debug(f"Tradable filtered symbols count: {len(filteredSymbols)}")
+
+        if not filteredSymbols:
+            self.context.logger.warning("No tradable symbols left after filtering")
+            return None
 
         underlying = Underlying(self.context, self.strategy.underlyingSymbol)
-        # Get the latest price of the underlying
         underlyingLastPrice = underlying.Price()
 
-        # Find the ATM strike
-        atm_strike = sorted(filteredSymbols
-                            ,key = lambda x: abs(x.ID.StrikePrice - underlying.Price())
-                            )[0].ID.StrikePrice
+        self.context.logger.debug(f"Underlying last price: {underlyingLastPrice}")
 
-        # Get the list of available strikes
+        if underlyingLastPrice is None:
+            self.context.logger.warning("Underlying price is None")
+            return None
+
+        try:
+            atm_strike = sorted(filteredSymbols, key=lambda x: abs(x.ID.StrikePrice - underlyingLastPrice))[0].ID.StrikePrice
+        except IndexError:
+            self.context.logger.error("Unable to find ATM strike. Check if filteredSymbols is empty or if strike prices are available.")
+            return None
+
+        self.context.logger.debug(f"ATM strike: {atm_strike}")
+
         strike_list = sorted(set([i.ID.StrikePrice for i in filteredSymbols]))
-
-        # Find the index of ATM strike in the sorted strike list
         atm_strike_rank = strike_list.index(atm_strike)
-        # Get the Min and Max strike price based on the specified number of strikes
         min_strike = strike_list[max(0, atm_strike_rank + min_strike_rank + 1)]
         max_strike = strike_list[min(atm_strike_rank + max_strike_rank - 1, len(strike_list)-1)]
 
-        # Get the list of symbols within the selected strike range
         selectedSymbols = [symbol for symbol in filteredSymbols
-                                if min_strike <= symbol.ID.StrikePrice <= max_strike
-                          ]
-        self.context.logger.debug(f"optionChainProviderFilter -> selectedSymbols: {selectedSymbols}")
-        # Loop through all Symbols and create a list of OptionContract objects
+                                if min_strike <= symbol.ID.StrikePrice <= max_strike]
+        
+        self.context.logger.debug(f"Selected symbols count: {len(selectedSymbols)}")
+
         contracts = []
         for symbol in selectedSymbols:
-            # Create the OptionContract
-            contract = OptionContract(symbol, symbol.Underlying)
-            self.AddOptionContracts([contract], resolution = self.context.timeResolution)
-
-            # Set the BidPrice
-            contract.BidPrice = self.Securities[contract.Symbol].BidPrice
-            # Set the AskPrice
-            contract.AskPrice = self.Securities[contract.Symbol].AskPrice
-            # Set the UnderlyingLastPrice
-            contract.UnderlyingLastPrice = underlyingLastPrice
-            # Add this contract to the output list
+            self.AddOptionContracts([symbol], resolution=self.context.timeResolution)
+            contract = ProviderOptionContract(symbol, underlyingLastPrice, self.context)
             contracts.append(contract)
-        
+
         self.context.executionTimer.stop('Tools.DataHandler -> optionChainProviderFilter')
-        
-        # Return the list of contracts
+
         return contracts
 
-    def getOptionContracts(self, slice):
-        # Start the timer
+    def getOptionContracts(self, slice=None):
         self.context.executionTimer.start('Tools.DataHandler -> getOptionContracts')
 
         contracts = None
-        # Set the DTE range (make sure values are not negative)
         minDte = max(0, self.strategy.dte - self.strategy.dteWindow)
         maxDte = max(0, self.strategy.dte)
         self.context.logger.debug(f"getOptionContracts -> minDte: {minDte}")
         self.context.logger.debug(f"getOptionContracts -> maxDte: {maxDte}")
-        # Loop through all chains
-        for chain in slice.OptionChains:
-            # Look for the specified optionSymbol
-            if chain.Key != self.strategy.optionSymbol:
-                continue
-            # Make sure there are any contracts in this chain
-            if chain.Value.Contracts.Count != 0:
-                # Put the contracts into a list so we can cache the Greeks across multiple strategies
-                contracts = [
-                    contract for contract in chain.Value if minDte <= (contract.Expiry.date() - self.context.Time.date()).days <= maxDte
-                ]
-        self.context.logger.debug(f"getOptionContracts -> number of contracts: {len(contracts) if contracts else 0}")
-        # If no chains were found, use OptionChainProvider to see if we can find any contracts
-        # Only do this for short term expiration contracts (DTE < 3) where slice.OptionChains usually fails to retrieve any chains
-        # We don't want to do this all the times for performance reasons
-        if contracts == None and self.strategy.dte < 3:
-            # Get the list of available option Symbols
+
+        if self.strategy.useSlice:
+            for chain in slice.OptionChains:
+                if self.strategy.optionSymbol == None or chain.Key != self.strategy.optionSymbol:
+                    continue
+                if chain.Value.Contracts.Count != 0:
+                    contracts = [
+                        contract for contract in chain.Value if minDte <= (contract.Expiry.date() - self.context.Time.date()).days <= maxDte
+                    ]
+            self.context.logger.debug(f"getOptionContracts -> number of contracts from slice: {len(contracts) if contracts else 0}")
+
+        if contracts is None:
             symbols = self.context.OptionChainProvider.GetOptionContractList(self.ticker, self.context.Time)
-            # Get the contracts
             contracts = self.optionChainProviderFilter(symbols, -self.strategy.nStrikesLeft, self.strategy.nStrikesRight, minDte, maxDte)
 
-        # Stop the timer
         self.context.executionTimer.stop('Tools.DataHandler -> getOptionContracts')
 
         return contracts
@@ -172,12 +159,14 @@ class DataHandler:
         # Add this contract to the data subscription so we can retrieve the Bid/Ask price
         if self.__CashTicker():
             for contract in contracts:
-                if contract.Symbol not in self.context.optionContractsSubscriptions:
+                if contract not in self.context.optionContractsSubscriptions:
                     self.context.AddIndexOptionContract(contract, resolution)
+                    self.context.optionContractsSubscriptions.append(contract)
         else:
             for contract in contracts:
-                if contract.Symbol not in self.context.optionContractsSubscriptions:
+                if contract not in self.context.optionContractsSubscriptions:
                     self.context.AddOptionContract(contract, resolution)
+                    self.context.optionContractsSubscriptions.append(contract)
 
     # PRIVATE METHODS
 
@@ -185,3 +174,4 @@ class DataHandler:
     # @returns [Boolean]
     def __CashTicker(self):
         return self.ticker in self.CashIndices
+

@@ -166,6 +166,8 @@ class Base(AlphaModel):
         "butteflyType": None,
         "butterflyLeftWingSize": 10,
         "butterflyRightWingSize": 10,
+        # useSlice determines if we should use the chainOption slice data instead of optionProvider. Default is set to FALSE
+        "useSlice": False,
     }
 
     def __init__(self, context):
@@ -417,11 +419,6 @@ class Base(AlphaModel):
 
         # Create the orders
         for contract in contracts:
-            # Subscribe to the option contract data feed
-            if contract.Symbol not in context.optionContractsSubscriptions:
-                context.AddOptionContract(contract.Symbol, context.timeResolution)
-                context.optionContractsSubscriptions.append(contract.Symbol)
-
             # Get the contract side (Long/Short)
             orderSide = contractSide[contract.Symbol]
             insight = Insight.Price(
