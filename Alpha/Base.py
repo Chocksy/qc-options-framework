@@ -167,7 +167,7 @@ class Base(AlphaModel):
         "butterflyLeftWingSize": 10,
         "butterflyRightWingSize": 10,
         # useSlice determines if we should use the chainOption slice data instead of optionProvider. Default is set to FALSE
-        "useSlice": False,
+        "useSlice": True,
     }
 
     def __init__(self, context):

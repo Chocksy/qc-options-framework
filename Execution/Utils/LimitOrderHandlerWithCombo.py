@@ -2,7 +2,7 @@
 from AlgorithmImports import *
 #endregion
 
-from Tools import ContractUtils, Logger, Underlying
+from Tools import ContractUtils, Logger, Underlying, BSM
 
 
 # Your New Python File
@@ -11,6 +11,7 @@ class LimitOrderHandlerWithCombo:
         self.context = context
         self.contractUtils = ContractUtils(context)
         self.base = base
+        self.bsm = BSM(context)
         # Set the logger
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
 
@@ -39,17 +40,6 @@ class LimitOrderHandlerWithCombo:
 
         # Exit if we are not at the right scheduled interval
         if orderTransactionIds and (order.lastRetry is None or self.sinceLastRetry(context, order, timedelta(minutes = 1))):
-            # """
-            # IMPORTANT!!:
-            # Why do we cancel?
-            # If we update the ticket with the new price then we risk execution while updating the price of the rest of the combo order causing discrepancies.
-            # """
-            # for id in orderTransactionIds:
-            #     ticket = context.Transactions.GetOrderTicket(id)
-            #     ticket.Cancel('Cancelled trade and trying with new prices')
-            # # store when we last canceled/retried and check with current time if like 2-3 minutes passed before we retry again.
-            # self.makeLimitOrder(position, order, retry = True)
-            # NOTE: If combo limit orders will execute limit orders instead of market orders then let's use this method.
             self.updateComboLimitOrder(position, order, orderTransactionIds)
         elif not orderTransactionIds:
             self.makeLimitOrder(position, order)
@@ -74,6 +64,8 @@ class LimitOrderHandlerWithCombo:
         orderSign = 2 * int(orderType == "open") - 1
         # Get the order sides
         orderSides = np.array([c.contractSide for c in position.legs])
+        # Set the Greeks for the contracts maily for display/logging
+        self.bsm.setGreeks(contracts)
 
         # Define the legs of the combo order
         legs = []
@@ -190,17 +182,21 @@ class LimitOrderHandlerWithCombo:
         contracts = [v.contract for v in position.legs]
 
         action = action or orderType.upper()
+        orderLimitPrice = self.limitOrderPrice(order)
+        if position.isCreditStrategy:
+            orderLimitPrice = -orderLimitPrice
 
         log_message = f"{action} {position.orderQuantity} {position.orderTag}, "
         log_message += f"{[c.Strike for c in contracts]} @ Mid: {round(execOrder.midPrice, 2)}, "
         log_message += f"NewLimit: {round(newLimitPrice, 2)}, "
-        log_message += f"Limit: {round(self.limitOrderPrice(order), 2)}, "
+        log_message += f"Limit: {round(orderLimitPrice, 2)}, "
         log_message += f"DTTM: {execOrder.limitOrderExpiryDttm}, "
         log_message += f"Spread: ${round(execOrder.bidAskSpread, 2)}, "
         log_message += f"Bid & Ask: {[(round(self.contractUtils.bidPrice(c), 2), round(self.contractUtils.askPrice(c),2)) for c in contracts]}, "
         log_message += f"Volume: {[self.contractUtils.volume(c) for c in contracts]}, "
-        log_message += f"OpenInterest: {[self.contractUtils.openInterest(c) for c in contracts]}"
-        
+        log_message += f"OpenInterest: {[self.contractUtils.openInterest(c) for c in contracts]}, "
+        log_message += f"Delta: {[round(self.contractUtils.delta(c), 2) for c in contracts]}"
+
         if orderType.lower() == 'close':
             log_message += f", Reason: {position.closeReason}"
         # To limit logs just log every 25 minutes
@@ -235,9 +231,11 @@ class LimitOrderHandlerWithCombo:
         # Calculate the range and step
         if self.base.adjustmentIncrement is None:
             # Calculate the step based on the bidAskSpread and the number of retries
-            step = execOrder.bidAskSpread / self.base.maxRetries
+            step = execOrder.bidAskSpread / retries
         else:
             step = self.base.adjustmentIncrement
+
+        step = max(step, 0.01) # Ensure the step is at least 0.01
 
         # Start with the preferred price
         target_price = execOrder.midPrice + step
@@ -282,7 +280,7 @@ class LimitOrderHandlerWithCombo:
         # Calculate the range and step
         if self.base.adjustmentIncrement is None:
             # Calculate the step based on the bidAskSpread and the number of retries
-            step = execOrder.bidAskSpread / self.base.maxRetries
+            step = execOrder.bidAskSpread / retries
         else:
             step = self.base.adjustmentIncrement
 
