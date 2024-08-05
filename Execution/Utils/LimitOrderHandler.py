@@ -2,7 +2,7 @@
 from AlgorithmImports import *
 #endregion
 
-from Tools import ContractUtils, Logger, Underlying
+from Tools import ContractUtils, Logger, Underlying, BSM
 
 
 # Your New Python File
@@ -11,6 +11,7 @@ class LimitOrderHandler:
         self.context = context
         self.contractUtils = ContractUtils(context)
         self.base = base
+        self.bsm = BSM(context)
         # Set the logger
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
 
@@ -46,7 +47,8 @@ class LimitOrderHandler:
             """
             for id in orderTransactionIds:
                 ticket = context.Transactions.GetOrderTicket(id)
-                ticket.Cancel('Cancelled trade and trying with new prices')
+                if ticket:
+                    ticket.Cancel('Cancelled trade and trying with new prices')
             # store when we last canceled/retried and check with current time if like 2-3 minutes passed before we retry again.
             self.makeLimitOrder(position, order, retry = True)
             # NOTE: If combo limit orders will execute limit orders instead of market orders then let's use this method.
@@ -76,6 +78,8 @@ class LimitOrderHandler:
         orderSign = 2 * int(orderType == "open") - 1
         # Get the order sides
         orderSides = np.array([c.contractSide for c in position.legs])
+        # Set the Greeks for the contracts maily for display/logging
+        self.bsm.setGreeks(contracts)
 
         # Define the legs of the combo order
         legs = []
@@ -135,8 +139,9 @@ class LimitOrderHandler:
         log_message += f"Spread: ${round(execOrder.bidAskSpread, 2)}, "
         log_message += f"Bid & Ask: {[(round(self.contractUtils.bidPrice(c), 2), round(self.contractUtils.askPrice(c),2)) for c in contracts]}, "
         log_message += f"Volume: {[self.contractUtils.volume(c) for c in contracts]}, "
-        log_message += f"OpenInterest: {[self.contractUtils.openInterest(c) for c in contracts]}"
-        
+        log_message += f"OpenInterest: {[self.contractUtils.openInterest(c) for c in contracts]}, "
+        log_message += f"Delta: {[round(self.contractUtils.delta(c), 2) for c in contracts]}"
+
         if orderType.lower() == 'close':
             log_message += f", Reason: {position.closeReason}"
         # To limit logs just log every 25 minutes
@@ -182,7 +187,7 @@ class LimitOrderHandler:
         # Calculate the range and step
         if self.base.adjustmentIncrement is None:
             # Calculate the step based on the bidAskSpread and the number of retries
-            step = execOrder.bidAskSpread / self.base.maxRetries
+            step = execOrder.bidAskSpread / retries
         else:
             step = self.base.adjustmentIncrement
 
@@ -229,7 +234,7 @@ class LimitOrderHandler:
         # Calculate the range and step
         if self.base.adjustmentIncrement is None:
             # Calculate the step based on the bidAskSpread and the number of retries
-            step = execOrder.bidAskSpread / self.base.maxRetries
+            step = execOrder.bidAskSpread / retries
         else:
             step = self.base.adjustmentIncrement
 

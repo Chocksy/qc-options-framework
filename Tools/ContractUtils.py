@@ -4,7 +4,6 @@ from AlgorithmImports import *
 
 from .Logger import Logger
 
-
 class ContractUtils:
     def __init__(self, context):
         # Set the context
@@ -47,47 +46,34 @@ class ContractUtils:
     def midPrice(self, contract):
         security = self.getSecurity(contract)
         return 0.5 * (security.BidPrice + security.AskPrice)
-    
-    def strikePrice(self, contract):
-        security = self.getSecurity(contract)
-        return security.symbol.ID.StrikePrice
-
-    def expiryDate(self, contract):
-        security = self.getSecurity(contract)
-        return security.symbol.ID.Date
 
     def volume(self, contract):
         security = self.getSecurity(contract)
         return security.Volume
-    
+
     def openInterest(self, contract):
         security = self.getSecurity(contract)
         return security.OpenInterest
-    
+
     def delta(self, contract):
-        security = self.getSecurity(contract)
-        return security.Delta
-    
+        return contract.BSMGreeks.Delta if hasattr(contract, 'BSMGreeks') else None
+
     def gamma(self, contract):
-        security = self.getSecurity(contract)
-        return security.Gamma
-    
+        return contract.BSMGreeks.Gamma if hasattr(contract, 'BSMGreeks') else None
+
     def theta(self, contract):
-        security = self.getSecurity(contract)
-        return security.Theta
-    
+        return contract.BSMGreeks.Theta if hasattr(contract, 'BSMGreeks') else None
+
     def vega(self, contract):
-        security = self.getSecurity(contract)
-        return security.Vega
-    
+        return contract.BSMGreeks.Vega if hasattr(contract, 'BSMGreeks') else None
+
     def rho(self, contract):
-        security = self.getSecurity(contract)
-        return security.Rho
-    
+        return contract.BSMGreeks.Rho if hasattr(contract, 'BSMGreeks') else None
+
     def bidPrice(self, contract):
         security = self.getSecurity(contract)
         return security.BidPrice
-    
+
     def askPrice(self, contract):
         security = self.getSecurity(contract)
         return security.AskPrice
