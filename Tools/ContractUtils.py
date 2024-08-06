@@ -47,6 +47,14 @@ class ContractUtils:
         security = self.getSecurity(contract)
         return 0.5 * (security.BidPrice + security.AskPrice)
 
+    def strikePrice(self, contract):
+        security = self.getSecurity(contract)
+        return security.symbol.ID.StrikePrice
+
+    def expiryDate(self, contract):
+        security = self.getSecurity(contract)
+        return security.symbol.ID.Date
+
     def volume(self, contract):
         security = self.getSecurity(contract)
         return security.Volume
