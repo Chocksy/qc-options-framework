@@ -6,7 +6,7 @@ from Tools import ContractUtils, Logger, Underlying, BSM
 
 
 # Your New Python File
-class LimitOrderHandler:
+class LimitOrderHandlerWithCombo:
     def __init__(self, context, base):
         self.context = context
         self.contractUtils = ContractUtils(context)
@@ -40,19 +40,7 @@ class LimitOrderHandler:
 
         # Exit if we are not at the right scheduled interval
         if orderTransactionIds and (order.lastRetry is None or self.sinceLastRetry(context, order, timedelta(minutes = 1))):
-            """
-            IMPORTANT!!:
-            Why do we cancel?
-            If we update the ticket with the new price then we risk execution while updating the price of the rest of the combo order causing discrepancies.
-            """
-            for id in orderTransactionIds:
-                ticket = context.Transactions.GetOrderTicket(id)
-                if ticket:
-                    ticket.Cancel('Cancelled trade and trying with new prices')
-            # store when we last canceled/retried and check with current time if like 2-3 minutes passed before we retry again.
-            self.makeLimitOrder(position, order, retry = True)
-            # NOTE: If combo limit orders will execute limit orders instead of market orders then let's use this method.
-            # self.updateComboLimitOrder(position, orderTransactionIds)
+            self.updateComboLimitOrder(position, order, orderTransactionIds)
         elif not orderTransactionIds:
             self.makeLimitOrder(position, order)
 
@@ -61,8 +49,6 @@ class LimitOrderHandler:
 
     def makeLimitOrder(self, position, order, retry = False):
         context = self.context
-        # Get the Limit order details
-        # Get the order type: open|close
         orderType = order.orderType
         limitOrderPrice = self.limitOrderPrice(order)
         execOrder = position[f"{orderType}Order"]
@@ -83,58 +69,127 @@ class LimitOrderHandler:
 
         # Define the legs of the combo order
         legs = []
-        isComboOrder = len(contracts) > 1
+
+        for n, contract in enumerate(contracts):
+            # Set the order side: -1 -> Sell, +1 -> Buy
+            orderSide = orderSign * orderSides[n]
+            if orderSide != 0:
+                legs.append(Leg.Create(contract.Symbol, orderSide))
+
+        # Calculate the new limit price
+        newLimitPrice = self.calculateNewLimitPrice(position, execOrder, limitOrderPrice, order.fillRetries, len(contracts), orderType)
 
         # Log the parameters used to validate the order
-        self.logger.debug(f"Executing Limit Order to {orderType} the position:")
-        self.logger.debug(f" - orderType: {orderType}")
-        self.logger.debug(f" - orderTag: {orderTag}")
-        self.logger.debug(f" - underlyingPrice: {Underlying(context, position.underlyingSymbol()).Price()}")
-        self.logger.debug(f" - strikes: {[c.Strike for c in contracts]}")
-        self.logger.debug(f" - orderQuantity: {orderQuantity}")
-        self.logger.debug(f" - midPrice: {execOrder.midPrice}  (limitOrderPrice: {limitOrderPrice})")
-        self.logger.debug(f" - bidAskSpread: {execOrder.bidAskSpread}")
+        self.logOrderDetails(position, order)
 
-        # Calculate the adjustment value based on the difference between the limit price and the total midPrice
-        # TODO: this might have to be changed if we start buying options instead of selling for premium.
+        # Execute the combo limit order
+        newTicket = context.ComboLimitOrder(legs, orderQuantity, newLimitPrice, tag=orderTag)
+        execOrder.transactionIds = [t.OrderId for t in newTicket]
+
+        # Log the order execution
+        self.logOrderExecution(position, order, newLimitPrice)
+
+        # Update order information if it's a retry
+        if retry:
+            order.lastRetry = context.Time
+            order.fillRetries += 1
+
+    def updateComboLimitOrder(self, position, order, orderTransactionIds):
+        context = self.context
+        orderType = order.orderType
+        execOrder = position[f"{orderType}Order"]
+
+        # Calculate the new limit price
+        limitOrderPrice = self.limitOrderPrice(order)
+        newLimitPrice = self.calculateNewLimitPrice(position, execOrder, limitOrderPrice, order.fillRetries, len(position.legs), orderType)
+
+        # Get the first order ticket (we only need to update one for the combo order)
+        ticket = context.Transactions.GetOrderTicket(orderTransactionIds[0])
+        
+        if ticket and ticket.Status != OrderStatus.Filled:
+            update_settings = UpdateOrderFields()
+            update_settings.LimitPrice = newLimitPrice
+            response = ticket.Update(update_settings)
+            
+            if response.IsSuccess:
+                self.logger.debug(f"Combo order updated successfully. New limit price: {newLimitPrice}")
+            else:
+                self.logger.warning(f"Failed to update combo order: {response.ErrorCode}")
+
+        # Log the update
+        self.logOrderExecution(position, order, newLimitPrice, action="UPDATED")
+
+        # Update order information
+        order.lastRetry = context.Time
+        order.fillRetries += 1  # increment the number of fill tries
+
+    def calculateNewLimitPrice(self, position, execOrder, limitOrderPrice, retries, nrContracts, orderType):
         if orderType == "close":
             adjustmentValue = self.calculateAdjustmentValueBought(
                 execOrder=execOrder,
                 limitOrderPrice=limitOrderPrice, 
-                retries=order.fillRetries, 
-                nrContracts=len(contracts)
+                retries=retries, 
+                nrContracts=nrContracts
             )
         else:
             adjustmentValue = self.calculateAdjustmentValueSold(
                 execOrder=execOrder,
                 limitOrderPrice=limitOrderPrice, 
-                retries=order.fillRetries, 
-                nrContracts=len(contracts)
+                retries=retries, 
+                nrContracts=nrContracts
             )
-        # IMPORTANT!! Because ComboLimitOrder right now still executes market orders we should not use it. We need to use ComboLegLimitOrder and that will work.
-        for n, contract in enumerate(contracts):
-            # Set the order side: -1 -> Sell, +1 -> Buy
-            orderSide = orderSign * orderSides[n]
-            if orderSide != 0:
-                newLimitPrice = self.contractUtils.midPrice(contract) + adjustmentValue if orderSide == -1 else self.contractUtils.midPrice(contract) - adjustmentValue
-                # round the price or we get an error like:
-                # Adjust the limit price to meet brokerage precision requirements
-                increment = self.base.adjustmentIncrement if self.base.adjustmentIncrement is not None else 0.05
-                newLimitPrice = round(newLimitPrice / increment) * increment
-                newLimitPrice = round(newLimitPrice, 1)  # Ensure the price is rounded to two decimal places
-                newLimitPrice = max(newLimitPrice, increment) # make sure the price is never 0. At least the increment.
-                self.logger.info(f"{orderType.upper()} {orderQuantity} {orderTag}, {contract.Symbol}, newLimitPrice: {newLimitPrice}")
 
-                if isComboOrder:
-                    legs.append(Leg.Create(contract.Symbol, orderSide, newLimitPrice))
-                else:
-                    newTicket = context.LimitOrder(contract.Symbol, orderQuantity, newLimitPrice, tag=orderTag)
-                    execOrder.transactionIds = [newTicket.OrderId]
+        # Determine if it's a credit or debit strategy
+        isCredit = position.isCreditStrategy
 
-        log_message = f"{orderType.upper()} {orderQuantity} {orderTag}, "
+        if isCredit:
+            # For credit strategies, we want to receive at least this much (negative value)
+            newLimitPrice = -(abs(execOrder.midPrice) - adjustmentValue) if orderType == "open" else -(abs(execOrder.midPrice) + adjustmentValue)
+        else:
+            # For debit strategies, we're willing to pay up to this much (positive value)
+            newLimitPrice = execOrder.midPrice + adjustmentValue if orderType == "open" else execOrder.midPrice - adjustmentValue
+
+        # Adjust the limit price to meet brokerage precision requirements
+        increment = self.base.adjustmentIncrement if self.base.adjustmentIncrement is not None else 0.05
+        newLimitPrice = round(newLimitPrice / increment) * increment
+        newLimitPrice = round(newLimitPrice, 2)  # Ensure the price is rounded to two decimal places
+
+        # Ensure the price is never 0 and maintains the correct sign
+        if isCredit:
+            newLimitPrice = min(newLimitPrice, -increment)
+        else:
+            newLimitPrice = max(newLimitPrice, increment)
+
+        return newLimitPrice
+
+    def logOrderDetails(self, position, order):
+        orderType = order.orderType
+        execOrder = position[f"{orderType}Order"]
+        contracts = [v.contract for v in position.legs]
+
+        self.logger.debug(f"Executing Limit Order to {orderType} the position:")
+        self.logger.debug(f" - orderType: {orderType}")
+        self.logger.debug(f" - orderTag: {position.orderTag}")
+        self.logger.debug(f" - underlyingPrice: {Underlying(self.context, position.underlyingSymbol()).Price()}")
+        self.logger.debug(f" - strikes: {[c.Strike for c in contracts]}")
+        self.logger.debug(f" - orderQuantity: {position.orderQuantity}")
+        self.logger.debug(f" - midPrice: {execOrder.midPrice}  (limitOrderPrice: {self.limitOrderPrice(order)})")
+        self.logger.debug(f" - bidAskSpread: {execOrder.bidAskSpread}")
+
+    def logOrderExecution(self, position, order, newLimitPrice, action=None):
+        orderType = order.orderType
+        execOrder = position[f"{orderType}Order"]
+        contracts = [v.contract for v in position.legs]
+
+        action = action or orderType.upper()
+        orderLimitPrice = self.limitOrderPrice(order)
+        if position.isCreditStrategy:
+            orderLimitPrice = -orderLimitPrice
+
+        log_message = f"{action} {position.orderQuantity} {position.orderTag}, "
         log_message += f"{[c.Strike for c in contracts]} @ Mid: {round(execOrder.midPrice, 2)}, "
-        log_message += f"NewLimit: {round(sum([l.OrderPrice * l.Quantity for l in legs]), 2)}, "
-        log_message += f"Limit: {round(limitOrderPrice, 2)}, "
+        log_message += f"NewLimit: {round(newLimitPrice, 2)}, "
+        log_message += f"Limit: {round(orderLimitPrice, 2)}, "
         log_message += f"DTTM: {execOrder.limitOrderExpiryDttm}, "
         log_message += f"Spread: ${round(execOrder.bidAskSpread, 2)}, "
         log_message += f"Bid & Ask: {[(round(self.contractUtils.bidPrice(c), 2), round(self.contractUtils.askPrice(c),2)) for c in contracts]}, "
@@ -146,17 +201,6 @@ class LimitOrderHandler:
             log_message += f", Reason: {position.closeReason}"
         # To limit logs just log every 25 minutes
         self.logger.info(log_message)
-
-        ### for contract in contracts
-        if isComboOrder:
-            # Execute by using a multi leg order if we have multiple sides.
-            newTicket = context.ComboLegLimitOrder(legs, orderQuantity, tag=orderTag)
-            execOrder.transactionIds = [t.OrderId for t in newTicket]
-        # Store the last retry on this order. This is not ideal but the only way to handle combo limit orders on QC as the comboLimitOrder and all the others
-        # as soon as you update one leg it will execute and mess it up.
-        if retry:
-            order.lastRetry = context.Time
-            order.fillRetries += 1 # increment the number of fill tries
 
     def limitOrderPrice(self, order):
         orderType = order.orderType
@@ -190,6 +234,8 @@ class LimitOrderHandler:
             step = execOrder.bidAskSpread / retries
         else:
             step = self.base.adjustmentIncrement
+
+        step = max(step, 0.01) # Ensure the step is at least 0.01
 
         # Start with the preferred price
         target_price = execOrder.midPrice + step
@@ -245,25 +291,4 @@ class LimitOrderHandler:
         adjustment_value = (target_price - execOrder.midPrice) / nrContracts
 
         return adjustment_value
-    
-    """
-    def updateComboLimitOrder(self, position, orderTransactionIds):
-        context = self.context
-
-        for id in orderTransactionIds:
-            ticket = context.Transactions.GetOrderTicket(id)
-            # store when we last canceled/retried and check with current time if like 2-3 minutes passed before we retry again.
-            leg = next((leg for leg in position.legs if ticket.Symbol == leg.symbol), None)            contract = leg.contract
-            # To update the limit price of the combo order, you only need to update the limit price of one of the leg orders.
-            # The Update method returns an OrderResponse to signal the success or failure of the update request.
-            if ticket and ticket.Status is not OrderStatus.Filled:
-                newLimitPrice = self.contractUtils.midPrice(contract) + 0.1 if leg.isSold else self.contractUtils.midPrice(contract) - 0.1
-
-                update_settings = UpdateOrderFields()
-                update_settings.LimitPrice = newLimitPrice
-                response = ticket.Update(update_settings)
-                # Check if the update was successful
-                if response.IsSuccess:
-                    self.logger.debug(f"Order updated successfully for {ticket.Symbol}")
-    """
     

@@ -18,7 +18,7 @@ class Scanner:
     def Call(self, data) -> [Dict, str]:
         # Start the timer
         self.context.executionTimer.start('Alpha.Utils.Scanner -> Call')
-        self.logger.debug(f'{self.base.name} -> Call -> start')
+        self.logger.trace(f'{self.base.name} -> Call -> start')
         if self.isMarketClosed():
             self.logger.trace(" -> Market is closed.")
             return None, None
@@ -30,25 +30,25 @@ class Scanner:
         if self.hasReachedMaxActivePositions():
             self.logger.trace(" -> Already reached max active positions.")
             return None, None
-        self.logger.debug(f'Not max active positions')
+        self.logger.trace(f'Not max active positions')
         # Get the option chain 
         chain = self.base.dataHandler.getOptionContracts(data)
-        print(f'Number of contracts in chain: {len(chain) if chain else 0}')
+        self.logger.trace(f'Number of contracts in chain: {len(chain) if chain else 0}')
         # Exit if we got no chains
         if chain is None:
             self.logger.debug(" -> No chains inside currentSlice!")
             return None, None
-        self.logger.debug('We have chains inside currentSlice')
+        self.logger.trace('We have chains inside currentSlice')
         self.syncExpiryList(chain)
         self.logger.debug(f'Expiry List: {self.expiryList}')
         # Exit if we haven't found any Expiration cycles to process
         if not self.expiryList:
             self.logger.trace(" -> No expirylist.")
             return None, None
-        self.logger.debug('We have expirylist {self.expiryList}')
+        self.logger.debug(f'We have expirylist {self.expiryList}')
         # Run the strategy
         filteredChain, lastClosedOrderTag = self.Filter(chain)
-        self.logger.debug(f'Filtered Chain Count: {len(filteredChain) if filteredChain else 0}')
+        self.logger.trace(f'Filtered Chain Count: {len(filteredChain) if filteredChain else 0}')
         self.logger.debug(f'Last Closed Order Tag: {lastClosedOrderTag}')
         # Stop the timer
         self.context.executionTimer.stop('Alpha.Utils.Scanner -> Call')
@@ -131,6 +131,7 @@ class Scanner:
             expiryListIndex = int(useFurthestExpiry) - 1
             # Get the expiry date
             expiry = list(self.expiryList.get(self.context.Time.date()))[expiryListIndex]
+            # expiry = list(self.expiryList.keys())[expiryListIndex]
         self.logger.debug(f'Expiry: {expiry}')
         # Convert the date to a string
         expiryStr = expiry.strftime("%Y-%m-%d")
@@ -243,5 +244,4 @@ class Scanner:
 
         # Return the filtered contracts
         return filteredChain
-
 

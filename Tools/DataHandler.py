@@ -144,7 +144,8 @@ class DataHandler:
             self.context.logger.debug(f"getOptionContracts -> number of contracts from slice: {len(contracts) if contracts else 0}")
 
         if contracts is None:
-            symbols = self.context.OptionChainProvider.GetOptionContractList(self.ticker, self.context.Time)
+            canonical_symbol = self.OptionsContract(self.strategy.underlyingSymbol)
+            symbols = self.context.OptionChainProvider.GetOptionContractList(canonical_symbol, self.context.Time)
             contracts = self.optionChainProviderFilter(symbols, -self.strategy.nStrikesLeft, self.strategy.nStrikesRight, minDte, maxDte)
 
         self.context.executionTimer.stop('Tools.DataHandler -> getOptionContracts')
@@ -167,6 +168,13 @@ class DataHandler:
                 if contract not in self.context.optionContractsSubscriptions:
                     self.context.AddOptionContract(contract, resolution)
                     self.context.optionContractsSubscriptions.append(contract)
+
+    def OptionsContract(self, underlyingSymbol):
+        if self.ticker == "SPX":
+            return Symbol.create_canonical_option(underlyingSymbol, "SPXW", Market.USA, "?SPXW")
+        else:
+            return Symbol.create_canonical_option(underlyingSymbol, self.ticker, Market.USA)
+            
 
     # PRIVATE METHODS
 

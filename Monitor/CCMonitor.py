@@ -12,7 +12,7 @@ class CCMonitor(Base):
         # The frequency (in minutes) with which each position is managed
         "managePositionFrequency": 5,
         # Profit Target Factor (Multiplier of the premium received/paid when the position was opened)
-        "profitTarget": 0.5,
+        "profitTarget": 1.5,
         # Stop Loss Multiplier, expressed as a function of the profit target (rather than the credit received)
         # The position is closed (Market Order) if:
         #    Position P&L < -abs(openPremium) * stopLossMultiplier
@@ -28,7 +28,7 @@ class CCMonitor(Base):
         #  - stopLossMultiplier < 1 (You can't lose more than the debit paid. i.e. stopLossMultiplier = 0.6 --> stop if P&L < -2.4$)
         # self.stopLossMultiplier = 3 * self.profitTarget
         # self.stopLossMultiplier = 0.6
-        "stopLossMultiplier": 1,
+        "stopLossMultiplier": None,
         # Ensures that the Stop Loss does not exceed the theoretical loss. (Set to False for Credit Calendars)
         "capStopLoss": True,
     }
