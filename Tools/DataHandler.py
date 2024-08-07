@@ -173,7 +173,7 @@ class DataHandler:
         if self.ticker == "SPX":
             return Symbol.create_canonical_option(underlyingSymbol, "SPXW", Market.USA, "?SPXW")
         else:
-            return Symbol.create_canonical_option(underlyingSymbol, self.ticker, Market.USA)
+            return Symbol.create_canonical_option(underlyingSymbol, Market.USA, f"?{self.ticker}")
             
 
     # PRIVATE METHODS
