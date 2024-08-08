@@ -4,4 +4,5 @@ from AlgorithmImports import *
 
 
 from .LimitOrderHandler import LimitOrderHandler
+from .LimitOrderHandlerWithCombo import LimitOrderHandlerWithCombo
 from .MarketOrderHandler import MarketOrderHandler

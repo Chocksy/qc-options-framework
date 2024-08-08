@@ -55,6 +55,8 @@ class Base(AlphaModel):
         "checkForDuplicatePositions": True,
         # Maximum number of open positions at any given time
         "maxActivePositions": 1,
+        # Maximum number of open orders (not filled) at any given time
+        "maxOpenPositions":2,
         # Maximum quantity used to scale each position. If the target premium cannot be reached within this
         # quantity (i.e. premium received is too low), the position is not going to be opened
         "maxOrderQuantity": 1,
@@ -167,7 +169,7 @@ class Base(AlphaModel):
         "butterflyLeftWingSize": 10,
         "butterflyRightWingSize": 10,
         # useSlice determines if we should use the chainOption slice data instead of optionProvider. Default is set to FALSE
-        "useSlice": False,
+        "useSlice": True,
     }
 
     def __init__(self, context):
@@ -459,6 +461,15 @@ class Base(AlphaModel):
         contracts = order["contracts"]
 
         openPositions = context.openPositions
+        """
+        workingOrders = context.workingOrders
+
+        # Get a list of orderIds from openPositions and workingOrders
+        orderIds = list(openPositions.keys()) + [workingOrder.orderId for workingOrder in workingOrders.values()]
+
+        # Iterate through the list of orderIds
+        for orderId in orderIds:
+        """
 
         # Iterate through open positions
         for orderTag, orderId in list(openPositions.items()):

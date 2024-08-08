@@ -35,8 +35,8 @@ class CentralAlgorithm(QCAlgorithm):
     def Initialize(self):
         # WARNING!! If your are going to trade SPX 0DTE options then make sure you set the startDate after July 1st 2022.
         # This is the start of the data we have.
-        self.SetStartDate(2023, 3, 1)
-        self.SetEndDate(2023, 3, 3)
+        self.SetStartDate(2023, 1, 3)
+        self.SetEndDate(2023, 1, 4)
         # self.SetStartDate(2024, 4, 1)
         # self.SetEndDate(2024, 4, 30)
         # self.SetEndDate(2022, 9, 15)
@@ -49,7 +49,7 @@ class CentralAlgorithm(QCAlgorithm):
         #  -> 2 = INFO
         #  -> 3 = DEBUG
         #  -> 4 = TRACE (Attention!! This can consume your entire daily log limit)
-        self.logLevel = 3 if self.LiveMode else 2
+        self.logLevel = 3 if self.LiveMode else 3
 
 
         # Set the initial account value
@@ -66,7 +66,7 @@ class CentralAlgorithm(QCAlgorithm):
         # Show the execution statistics
         self.showExecutionStats = False
         # Show the performance statistics
-        self.showPerformanceStats = True
+        self.showPerformanceStats = False
 
         # Set the algorithm base variables and structures
         self.structure = SetupBaseStructure(self).Setup()
@@ -75,8 +75,8 @@ class CentralAlgorithm(QCAlgorithm):
 
         # Set the algorithm framework models
         # self.SetAlpha(FPLModel(self))
-        # self.SetAlpha(SPXic(self))
-        self.SetAlpha(CCModel(self))
+        self.SetAlpha(SPXic(self))
+        # self.SetAlpha(CCModel(self))
         # self.SetAlpha(SPXButterfly(self))
         # self.SetAlpha(SPXCondor(self))
 
@@ -84,16 +84,16 @@ class CentralAlgorithm(QCAlgorithm):
 
         # self.SetPortfolioConstruction(InsightWeightingPortfolioConstructionModel())
         # self.SetExecution(SpreadExecutionModel())
-        # self.SetExecution(SPXExecutionModel(self))
-        self.SetExecution(AutoExecutionModel(self))
+        self.SetExecution(SPXExecutionModel(self))
+        # self.SetExecution(AutoExecutionModel(self))
         # self.SetExecution(SmartPricingExecutionModel(self))
         # self.SetExecution(ImmediateExecutionModel())
 
         # self.SetRiskManagement(NoStopLossModel(self))
         # self.SetRiskManagement(StopLossModel(self))
         # self.SetRiskManagement(FPLMonitorModel(self))
-        # self.SetRiskManagement(SPXicMonitor(self))
-        self.SetRiskManagement(CCMonitor(self))
+        self.SetRiskManagement(SPXicMonitor(self))
+        # self.SetRiskManagement(CCMonitor(self))
         # self.SetRiskManagement(SPXButterflyMonitor(self))
         # self.SetRiskManagement(SPXCondorMonitor(self))
 
@@ -168,6 +168,5 @@ class CentralAlgorithm(QCAlgorithm):
         # Find the last trading day for the given expiration date
         lastDay = list(tradingCalendar.GetDaysByType(TradingDayType.BusinessDay, expiry - timedelta(days = 20), expiry))[-1].Date
         return lastDay
-
 
 

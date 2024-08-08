@@ -1,7 +1,7 @@
 from AlgorithmImports import *
 
 from Tools import ContractUtils, Logger
-from Execution.Utils import MarketOrderHandler, LimitOrderHandler
+from Execution.Utils import MarketOrderHandler, LimitOrderHandler, LimitOrderHandlerWithCombo
 """
 """
 
@@ -33,23 +33,13 @@ class Base(ExecutionModel):
 
     def __init__(self, context):
         self.context = context
-        # Calculate maxRetries based on speedOfFill
-        speedOfFill = self.parameter("speedOfFill")
-        if speedOfFill == "Patient":
-            self.maxRetries = 7
-        elif speedOfFill == "Normal":
-            self.maxRetries = 5
-        elif speedOfFill == "Fast":
-            self.maxRetries = 3
-        else:
-            raise ValueError("Invalid speedOfFill value")
-
         self.targetsCollection = PortfolioTargetCollection()
         self.contractUtils = ContractUtils(context)
         # Set the logger
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
         self.marketOrderHandler = MarketOrderHandler(context, self)
-        self.limitOrderHandler = LimitOrderHandler(context, self)
+        # self.limitOrderHandler = LimitOrderHandler(context, self)
+        self.limitOrderHandler = LimitOrderHandlerWithCombo(context, self)
         self.logger.debug(f"{self.__class__.__name__} -> __init__")
         # Gets or sets the maximum spread compare to current price in percentage.
         # self.acceptingSpreadPercent = Math.Abs(acceptingSpreadPercent)
@@ -70,6 +60,16 @@ class Base(ExecutionModel):
     def Execute(self, algorithm, targets):
         self.context.executionTimer.start('Execution.Base -> Execute')
 
+        # Add condition to return based on speedOfFill
+        speed_of_fill = self.parameter("speedOfFill")
+        current_minute = algorithm.Time.minute
+
+        if speed_of_fill == "Patient" and current_minute % 5 != 0:
+            return
+        elif speed_of_fill == "Normal" and current_minute % 3 != 0:
+            return
+        # For "Fast", we execute every minute, so no condition needed
+
         # Use this section to check if a target is in the workingOrder dict
         self.targetsCollection.AddRange(targets)
         self.logger.debug(f"{self.__class__.__name__} -> Execute -> targets: {targets}")
@@ -79,7 +79,12 @@ class Base(ExecutionModel):
         # Check if the workingOrders are still OK to execute
         self.context.structure.checkOpenPositions()
         self.logger.debug(f"{self.__class__.__name__} -> Execute -> checkOpenPositions")
+        max_retries = self.parameter("maxRetries")
         for order in list(self.context.workingOrders.values()):
+            if order.fillRetries > max_retries:
+                self.logger.debug(f"Order {order.orderId} exceeded max retries. Skipping.")
+                continue
+
             position = self.context.allPositions[order.orderId]
 
             useLimitOrders = order.useLimitOrder
@@ -117,5 +122,3 @@ class Base(ExecutionModel):
         self.context.charting.updateCharts()
 
         self.context.executionTimer.stop('Execution.Base -> Execute')
-
-

@@ -14,6 +14,8 @@ class SPXic(Base):
         "scheduleFrequency": timedelta(minutes = 5),
         # Maximum number of open positions at any given time
         "maxActivePositions": 10,
+        # Maximum number of open orders (not filled) at any given time
+        "maxOpenPositions":1,
         # Control whether to allow multiple positions to be opened for the same Expiration date
         "allowMultipleEntriesPerExpiry": True,
         # Minimum time distance between opening two consecutive trades
@@ -33,9 +35,10 @@ class SPXic(Base):
         "nStrikesLeft": 18,
         "nStrikesRight": 18,
         # TODO fix this and set it based on buying power.
-        "maxOrderQuantity": 10,
+        # "maxOrderQuantity": 200,
         # COMMENT OUT this one below because it caused the orderQuantity to be 162 and maxOrderQuantity to be 10 so it would not place trades.
-        # "targetPremiumPct": 0.015,
+        "targetPremiumPct": 0.01,
+        "validateQuantity": False,
         # Minimum premium accepted for opening a new position. Setting this to None disables it.
         "minPremium": 0.9,
         # Maximum premium accepted for opening a new position. Setting this to None disables it.
@@ -44,7 +47,7 @@ class SPXic(Base):
         "profitTarget": 1.0,
         "bidAskSpreadRatio": 0.4,
         "validateBidAskSpread": True,
-        "marketCloseCutoffTime": None, #time(15, 45, 0),
+        "marketCloseCutoffTime": time(15, 45, 0),
         # Put/Call Wing size for Iron Condor, Iron Fly
         "putWingSize": 10,
         "callWingSize": 10,
@@ -71,8 +74,8 @@ class SPXic(Base):
         if data.ContainsKey(self.underlyingSymbol):
             self.logger.debug(f"SPXic -> getOrder: Data contains key {self.underlyingSymbol}")
             # trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0), time(15, 0, 0), time(15, 15, 0), time(15, 45, 0)]
-            # trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0)]
-            trade_times = [time(hour, minute, 0) for hour in range(9, 15) for minute in range(0, 60, 30) if not (hour == 15 and minute > 0)]
+            trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0)]
+            # trade_times = [time(hour, minute, 0) for hour in range(9, 15) for minute in range(0, 60, 30) if not (hour == 15 and minute > 0)]
             # Remove the microsecond from the current time
             current_time = self.context.Time.time().replace(microsecond=0)
             self.logger.debug(f"SPXic -> getOrder -> current_time: {current_time}")
