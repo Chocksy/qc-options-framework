@@ -14,6 +14,8 @@ class SPXic(Base):
         "scheduleFrequency": timedelta(minutes = 5),
         # Maximum number of open positions at any given time
         "maxActivePositions": 10,
+        # Maximum number of open orders (not filled) at any given time
+        "maxOpenPositions":1,
         # Control whether to allow multiple positions to be opened for the same Expiration date
         "allowMultipleEntriesPerExpiry": True,
         # Minimum time distance between opening two consecutive trades
