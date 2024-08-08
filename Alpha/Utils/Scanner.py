@@ -194,6 +194,13 @@ class Scanner:
 
         # Do not open any new positions if we have reached the maximum for this strategy
         return (len(openPositionsByStrategy) + len(workingOrdersByStrategy)) >= self.base.maxActivePositions
+    
+    def hasReachedMaxOpenPositions(self) -> bool:
+        # Filter openPositions and workingOrders by strategyTag
+        workingOrdersByStrategy = {tag: order for tag, order in self.context.workingOrders.items() if order.strategyTag == self.base.nameTag}
+
+        # Do not open any new positions if we have reached the maximum for this strategy
+        return (len(workingOrdersByStrategy)) >= self.base.maxOpenPositions
 
     def syncExpiryList(self, chain):
         # The list of expiry dates will change once a day (at most). See if we have already processed this list for the current date
@@ -249,4 +256,3 @@ class Scanner:
 
         # Return the filtered contracts
         return filteredChain
-
