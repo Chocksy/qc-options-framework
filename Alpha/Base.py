@@ -55,6 +55,8 @@ class Base(AlphaModel):
         "checkForDuplicatePositions": True,
         # Maximum number of open positions at any given time
         "maxActivePositions": 1,
+        # Maximum number of open orders (not filled) at any given time
+        "maxOpenPositions":2,
         # Maximum quantity used to scale each position. If the target premium cannot be reached within this
         # quantity (i.e. premium received is too low), the position is not going to be opened
         "maxOrderQuantity": 1,

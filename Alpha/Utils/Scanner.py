@@ -30,6 +30,11 @@ class Scanner:
         if self.hasReachedMaxActivePositions():
             self.logger.trace(" -> Already reached max active positions.")
             return None, None
+
+        if self.hasReachedMaxOpenPositions():
+            self.logger.trace(" -> Already reached max open orders at the same time.")
+            return None, None
+            
         self.logger.trace(f'Not max active positions')
         # Get the option chain 
         chain = self.base.dataHandler.getOptionContracts(data)
