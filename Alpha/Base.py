@@ -296,6 +296,9 @@ class Base(AlphaModel):
 
 
     def GetOrder(self, chain):
+        """
+        Get the order with extra filters applied by the strategy.
+        """
         raise NotImplementedError("GetOrder() not implemented")
 
     def CreateInsights(self, chain, lastClosedOrderTag=None, data = Slice) -> List[Insight]:
