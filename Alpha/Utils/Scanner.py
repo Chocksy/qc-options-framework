@@ -5,6 +5,16 @@ from AlgorithmImports import *
 from Tools import BSM, Logger
 
 class Scanner:
+    """
+    Handles the scanning and filtering of options chains. Manages market open checks, scheduling, and options chain expiration synchronization.
+
+    Attributes:
+        context (Any): Context of the algorithm, includes settings and state.
+        base (Any): Configuration object with strategy settings.
+        bsm (BSM): Black-Scholes-Merton model instance for options valuation.
+        expiryList (dict): Stores expiration dates available for trading.
+        logger (Logger): Logger for operational logging.
+    """
     def __init__(self, context, base):
         self.context = context
         self.base = base
@@ -16,6 +26,15 @@ class Scanner:
         self.logger = Logger(context, className = type(self).__name__, logLevel = context.logLevel)
 
     def Call(self, data) -> [Dict, str]:
+        """
+        Processes incoming data to scan and filter option contracts. It checks market status, scheduled trading times, and position limits before proceeding with filtering.
+
+        Args:
+            data: Incoming data containing options chain and market conditions.
+
+        Returns:
+            Tuple[Dict, str]: Filtered options chain and a tag from the last closed order or (None, None) if no eligible contracts are found.
+        """
         # Start the timer
         self.context.executionTimer.start('Alpha.Utils.Scanner -> Call')
         self.logger.trace(f'{self.base.name} -> Call -> start')
@@ -59,8 +78,16 @@ class Scanner:
         self.context.executionTimer.stop('Alpha.Utils.Scanner -> Call')
         return filteredChain, lastClosedOrderTag
 
-    # Filter the contracts to buy and sell based on the defined AlphaModel/Strategy
     def Filter(self, chain):
+        """
+        Filter the option chain based on the AlphaModel's filtering logic and determines which contracts to engage based on strategy parameters.
+
+        Args:
+            chain (list): List of option contracts.
+
+        Returns:
+            Tuple[List, str]: Filtered list of option contracts and last closed order tag.
+        """
         # Start the timer
         self.context.executionTimer.start("Alpha.Utils.Scanner -> Filter")
 
@@ -154,10 +181,22 @@ class Scanner:
         return filteredChain, lastClosedOrderTag
 
     def isMarketClosed(self) -> bool:
+        """
+        Check if the market is currently closed or if the algorithm is warming up.
+
+        Returns:
+            bool: True if the market is closed or the algorithm is warming up; False otherwise.
+        """
         # Exit if the algorithm is warming up or the market is closed
         return self.context.IsWarmingUp or not self.context.IsMarketOpen(self.base.underlyingSymbol)
 
     def isWithinScheduledTimeWindow(self) -> bool:
+        """
+        Check if the current time is within the scheduled time window for trading.
+
+        Returns:
+            bool: True if the current time is within the scheduled time window; False otherwise.
+        """
         # Compute the schedule start datetime
         scheduleStartDttm = datetime.combine(self.context.Time.date(), self.base.scheduleStartTime)
         self.logger.debug(f'Schedule Start Datetime: {scheduleStartDttm}')
@@ -188,6 +227,12 @@ class Scanner:
         return isWithinWindow
 
     def hasReachedMaxActivePositions(self) -> bool:
+        """
+        Determine if the maximum number of active positions for the strategy has been reached.
+
+        Returns:
+            bool: True if the maximum number of active positions has been reached; False otherwise.
+        """
         # Filter openPositions and workingOrders by strategyTag
         openPositionsByStrategy = {tag: pos for tag, pos in self.context.openPositions.items() if self.context.allPositions[pos].strategyTag == self.base.nameTag}
         workingOrdersByStrategy = {tag: order for tag, order in self.context.workingOrders.items() if order.strategyTag == self.base.nameTag}
@@ -203,6 +248,12 @@ class Scanner:
         return (len(workingOrdersByStrategy)) >= self.base.maxOpenPositions
 
     def syncExpiryList(self, chain):
+        """
+        Synchronize the list of expiry dates based on the current chain and store it in the expiry list.
+
+        Args:
+            chain: A list of option contracts used to update the expiry dates.
+        """
         # The list of expiry dates will change once a day (at most). See if we have already processed this list for the current date
         if self.context.Time.date() in self.expiryList:
             # Get the expiryList from the dictionary
@@ -232,6 +283,17 @@ class Scanner:
             self.context.executionTimer.stop("Alpha.Utils.Scanner -> syncExpiryList")
 
     def filterByExpiry(self, chain, expiry=None, computeGreeks=False):
+        """
+        Filters the options chain to include only contracts with a specific expiry date. Optionally calculates Greeks for the filtered contracts if requested.
+
+        Args:
+            chain (list[OptionContract]): The list of option contracts from which to filter.
+            expiry (datetime.date, optional): The specific expiry date to filter for. If not provided, no expiry-based filtering is applied.
+            computeGreeks (bool, optional): If True, calculates the Greeks for the filtered contracts. This operation is resource-intensive.
+
+        Returns:
+            list[OptionContract]: The list of option contracts that meet the expiry filter criteria. If no expiry is provided, the original list is returned.
+        """
         # Start the timer
         self.context.executionTimer.start("Alpha.Utils.Scanner -> filterByExpiry")
 

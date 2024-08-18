@@ -9,21 +9,45 @@ from Strategy import Position
 
 
 class Order:
+    """
+    Represents an order handling system, capable of managing different
+    types of options orders including complex strategies like straddles, 
+    strangles, and spreads.
+
+    This class encapsulates all the logic necessary to build, evaluate, 
+    and manage the lifecycle of orders based on market data and 
+    predefined strategies.
+
+    Attributes:
+        context (Any): Context in which the order exists, providing access to current market conditions and account settings.
+        base (Any): Base configuration for the order, containing parameters like maximum order quantity and target premium percentage.
+        logger (Logger): Logger for debugging and logging runtime information.
+        bsm (BSM): Black-Scholes-Merton pricing model for options valuation.
+        contractUtils (ContractUtils): Utility functions for managing contract-related operations.
+        strategyBuilder (OrderBuilder): Builder for creating and managing trading strategies and orders.
+    """
     def __init__(self, context, base):
         self.context = context
-        self.base = base
-        # Set the logger
-        self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
-        # Initialize the BSM pricing model
-        self.bsm = BSM(context)
-        # Initialize the contract utils
-        self.contractUtils = ContractUtils(context)
-        # Initialize the Strategy Builder
-        self.strategyBuilder = OrderBuilder(context)
+        self.base = base 
+        self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel) # Set the logger
+        self.bsm = BSM(context) # Initialize the BSM pricing model
+        self.contractUtils = ContractUtils(context) # Initialize the contract utils
+        self.strategyBuilder = OrderBuilder(context) # Initialize the Strategy Builder
 
-    # Function to evaluate the P&L of the position
     def fValue(self, spotPrice, contracts, sides=None, atTime=None, openPremium=None):
-        # Compute the theoretical value at the given Spot price and point in time
+        """
+        Calculates the financial value of a set of contracts at a specified spot price, time, and market conditions.
+
+        Args:
+            spotPrice (float): Current spot price of the underlying asset.
+            contracts (list): List of contract objects involved in the calculation.
+            sides (list, optional): Specifies whether each contract is a buy (+1) or sell (-1). Default is None.
+            atTime (datetime, optional): Specific point in time for valuation. Default is None.
+            openPremium (float, optional): Initial premium paid or received when the position was opened. Default is None.
+
+        Returns:
+            float: Total financial value of the position.
+        """
         prices = np.array(
             [
                 self.bsm.bsmPrice(
@@ -39,8 +63,19 @@ class Order:
         value = openPremium + sum(prices * np.array(sides))
         return value
 
+
     def getPayoff(self, spotPrice, contracts, sides):
-        # Exit if there are no contracts to process
+        """
+        Calculate the payoff of the position at a given spot price.
+
+        Args:
+            spotPrice (float): The price of the underlying asset.
+            contracts (list): List of contracts in the position.
+            sides (list): List of sides (buy/sell) for each contract.
+
+        Returns:
+            float: The total payoff of the position.
+        """
         if len(contracts) == 0:
             return 0
 
@@ -59,8 +94,18 @@ class Order:
         # Return the payoff
         return payoff
 
+
     def computeOrderMaxLoss(self, contracts, sides):
-        # Exit if there are no contracts to process
+        """
+        Compute the maximum possible loss for the order. Essential method for risk management.
+
+        Args:
+            contracts (list): Contracts included in the order.
+            sides (list): Trading side (buy/sell) for each contract.
+
+        Returns:
+            float: Maximum possible loss for the order.
+        """
         if len(contracts) == 0:
             return 0
 
@@ -79,8 +124,14 @@ class Order:
         # Return the max loss
         return maxLoss
 
+
     def getMaxOrderQuantity(self):
-        # Get the context
+        """
+        Get the maximum order quantity based on the current portfolio and strategy configuration.
+
+        Returns:
+            int: Maximum allowable order quantity based on current strategy settings and account performance.
+        """
         context = self.context
 
         # Get the maximum order quantity parameter
@@ -96,8 +147,19 @@ class Order:
         # Return the result
         return maxOrderQuantity
 
+
+
     def isDuplicateOrder(self, contracts, sides):
-        # Loop through all working orders of this strategy
+        """
+        Check if the given order is a duplicate of any existing working orders.
+
+        Args:
+            contracts (list): List of contracts in the position.
+            sides (list): List of sides (buy/sell) for each contract.
+
+        Returns:
+            bool: True if the order is a duplicate, False otherwise.
+        """
         for orderTag in list(self.context.workingOrders):
             # Get the current working order
             workingOrder = self.context.workingOrders.get(orderTag)
@@ -131,7 +193,16 @@ class Order:
         return False
 
     def limitOrderPrice(self, sides, orderMidPrice):
-        # Get the limitOrderAbsolutePrice
+        """
+        Adjusts the limit order price based on predefined slippage and premium parameters.
+
+        Args:
+            sides (list): List of sides (buy/sell) for each contract.
+            orderMidPrice (float): The mid price of the order.
+
+        Returns:
+            float: The computed limit order price.
+        """
         limitOrderAbsolutePrice = self.base.limitOrderAbsolutePrice
         # Get the minPremium and maxPremium to determine the limit price based on that.
         minPremium = self.base.minPremium
@@ -165,8 +236,22 @@ class Order:
 
         return limitOrderPrice
 
-    # Create dictionary with the details of the order to be submitted
     def getOrderDetails(self, contracts, sides, strategy, sell=True, strategyId=None, expiry=None, sidesDesc=None):
+        """
+        Constructs a detailed order dictionary with all relevant parameters for order execution.
+
+        Args:
+            contracts (list): List of contracts to process.
+            sides (list): List indicating the side (short/long) for each contract.
+            strategy (str): Strategy description.
+            sell (bool): Indicates if the order is a sell (credit strategy). Default is True.
+            strategyId (str): Strategy ID. If not specified, derived from the strategy name.
+            expiry (datetime): Expiration date of the contracts. Default is the expiry of the first contract.
+            sidesDesc (list): List of descriptions for each contract side. Default is derived from the contracts and sides.
+
+        Returns:
+            dict: Dictionary with the details of the order or None if no valid order is created.
+        """
         # Exit if there are no contracts to process
         if not contracts:
             return
@@ -432,6 +517,21 @@ class Order:
         return order
 
     def getNakedOrder(self, contracts, type, strike = None, delta = None, fromPrice = None, toPrice = None, sell = True):
+        """
+        Create an order for a naked option position.
+
+        Args:
+            contracts (list): List of contracts to process.
+            type (str): Type of option ("put" or "call").
+            strike (float): Strike price filter for the options.
+            delta (float): Delta filter for the options.
+            fromPrice (float): Minimum price filter for the options.
+            toPrice (float): Maximum price filter for the options.
+            sell (bool): Indicates if the order is a sell (short position). Default is True.
+
+        Returns:
+            dict: Dictionary with the details of the naked option order or None if no valid order is created.
+        """
         if sell:
             # Short option contract
             sides = [-1]
@@ -459,10 +559,19 @@ class Order:
             # Return the order
             return order
 
-
-    # Create order details for a Straddle order
     def getStraddleOrder(self, contracts, strike = None, netDelta = None, sell = True):
-
+        """
+        Create order details for a Straddle order.
+        
+        Args:
+            contracts (list): The list of contract objects.
+            strike (float, optional): The strike price to center the straddle on. Defaults to None.
+            netDelta (float, optional): The net delta for delta strike selection. Defaults to None.
+            sell (bool, optional): Indicates if this is a sell (short) order. Defaults to True.
+        
+        Returns:
+            dict: The order details for the Straddle.
+        """
         if sell:
             # Short Straddle
             sides = [-1, -1]
@@ -502,9 +611,21 @@ class Order:
         return order
 
 
-    # Create order details for a Strangle order
     def getStrangleOrder(self, contracts, callDelta = None, putDelta = None, callStrike = None, putStrike = None, sell = True):
-
+        """
+        Create order details for a Strangle order.
+        
+        Args:
+            contracts (list): The list of contract objects.
+            callDelta (float, optional): The delta for the call option. Defaults to None.
+            putDelta (float, optional): The delta for the put option. Defaults to None.
+            callStrike (float, optional): The strike price for the call option. Defaults to None.
+            putStrike (float, optional): The strike price for the put option. Defaults to None.
+            sell (bool, optional): Indicates if this is a sell (short) order. Defaults to True.
+        
+        Returns:
+            dict: The order details for the Strangle.
+        """
         if sell:
             # Short Strangle
             sides = [-1, -1]
@@ -531,7 +652,23 @@ class Order:
 
 
     def getSpreadOrder(self, contracts, type, strike = None, delta = None, wingSize = None, sell = True, fromPrice = None, toPrice = None, premiumOrder = "max"):
-
+        """
+        Create order details for a Spread order.
+        
+        Args:
+            contracts (list): The list of contract objects.
+            type (str): The type of spread ("Put" or "Call").
+            strike (float, optional): The strike price for the spread. Defaults to None.
+            delta (float, optional): The delta for the spread. Defaults to None.
+            wingSize (float, optional): The wing size for the spread. Defaults to None.
+            sell (bool, optional): Indicates if this is a sell (short) order. Defaults to True.
+            fromPrice (float, optional): The minimum price for the spread. Defaults to None.
+            toPrice (float, optional): The maximum price for the spread. Defaults to None.
+            premiumOrder (str, optional): The premium order for the spread. Defaults to "max".
+        
+        Returns:
+            dict: The order details for the Spread.
+        """
         if sell:
             # Credit Spread
             sides = [-1, 1]
@@ -558,7 +695,22 @@ class Order:
 
 
     def getIronCondorOrder(self, contracts, callDelta = None, putDelta = None, callStrike = None, putStrike = None, callWingSize = None, putWingSize = None, sell = True):
-
+        """
+        Create order details for an Iron Condor order.
+        
+        Args:
+            contracts (list): The list of contract objects.
+            callDelta (float, optional): The delta for the call options. Defaults to None.
+            putDelta (float, optional): The delta for the put options. Defaults to None.
+            callStrike (float, optional): The strike price for the call options. Defaults to None.
+            putStrike (float, optional): The strike price for the put options. Defaults to None.
+            callWingSize (float, optional): The wing size for the call options. Defaults to None.
+            putWingSize (float, optional): The wing size for the put options. Defaults to None.
+            sell (bool, optional): Indicates if this is a sell (short) order. Defaults to True.
+        
+        Returns:
+            dict: The order details for the Iron Condor.
+        """
         if sell:
             # Sell Iron Condor: [longPut, shortPut, shortCall, longCall]
             sides = [1, -1, -1, 1]
@@ -587,7 +739,20 @@ class Order:
 
 
     def getIronFlyOrder(self, contracts, netDelta = None, strike = None, callWingSize = None, putWingSize = None, sell = True):
-
+        """
+        Create order details for an Iron Fly order.
+        
+        Args:
+            contracts (list): The list of contract objects.
+            netDelta (float, optional): The net delta for delta strike selection. Defaults to None.
+            strike (float, optional): The strike price to center the Iron Fly on. Defaults to None.
+            callWingSize (float, optional): The wing size for the call options. Defaults to None.
+            putWingSize (float, optional): The wing size for the put options. Defaults to None.
+            sell (bool, optional): Indicates if this is a sell (short) order. Defaults to True.
+        
+        Returns:
+            dict: The order details for the Iron Fly.
+        """
         if sell:
             # Sell Iron Fly: [longPut, shortPut, shortCall, longCall]
             sides = [1, -1, -1, 1]
@@ -626,7 +791,21 @@ class Order:
 
 
     def getButterflyOrder(self, contracts, type, netDelta = None, strike = None, leftWingSize = None, rightWingSize = None, sell = False):
-
+        """
+        Create order details for a Butterfly order.
+        
+        Args:
+            contracts (list): The list of contract objects.
+            type (str): The type of butterfly ("Put" or "Call").
+            netDelta (float, optional): The net delta for delta strike selection. Defaults to None.
+            strike (float, optional): The strike price to center the Butterfly on. Defaults to None.
+            leftWingSize (float, optional): The wing size for the left side. Defaults to None.
+            rightWingSize (float, optional): The wing size for the right side. Defaults to None.
+            sell (bool, optional): Indicates if this is a sell (short) order. Defaults to False.
+        
+        Returns:
+            dict: The order details for the Butterfly.
+        """
         # Make sure the wing sizes are set
         leftWingSize = leftWingSize or rightWingSize or 1
         rightWingSize = rightWingSize or leftWingSize or 1
@@ -708,7 +887,21 @@ class Order:
 
 
     def getCustomOrder(self, contracts, types, deltas = None, sides = None, sidesDesc = None, strategy = "Custom", sell = None):
-
+        """
+        Create order details for a custom order.
+        
+        Args:
+            contracts (list): The list of contract objects.
+            types (str or list): The types of options ("Put" or "Call").
+            deltas (list, optional): The deltas for the options. Defaults to None.
+            sides (list, optional): The sides for the options (1 for buy, -1 for sell). Defaults to None.
+            sidesDesc (list, optional): Descriptions for the sides. Defaults to None.
+            strategy (str, optional): The name of the strategy. Defaults to "Custom".
+            sell (bool, optional): Indicates if this is a sell (short) order. Defaults to None.
+        
+        Returns:
+            dict: The order details for the custom strategy.
+        """
         # Make sure the Sides parameter has been specified
         if not sides:
             self.logger.error("Input parameter sides cannot be null. No order will be returned.")

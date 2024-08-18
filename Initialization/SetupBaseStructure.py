@@ -5,12 +5,20 @@ from AlgorithmImports import *
 from Tools import Timer, Logger, DataHandler, Underlying, Charting
 from Initialization import AlwaysBuyingPowerModel, BetaFillModel, TastyWorksFeeModel
 
-"""
-    This class is used to setup the base structure of the algorithm in the main.py file.
-    It is used to setup the logger, the timer, the brokerage model, the security initializer, the
-    option chain filter function and the benchmark.
-    It is also used to schedule an event to get the underlying price at market open.
-    The class has chainable methods for Setup and AddUnderlying.
+
+
+
+class SetupBaseStructure:
+    """
+    Manages the initialization and setup of an algorithm's base structure. This includes configuring the brokerage model,
+    security initializer, option chain filter function, and scheduling market open events. The class supports chainable methods
+    for easier setup and configuration.
+
+    Attributes:
+        context (QuantConnect.Algorithm.QCAlgorithm): The context in which the algorithm operates, providing access to all
+            QuantConnect API methods and properties.
+        DEFAULT_PARAMETERS (dict): A dictionary containing default parameters for the strategy, such as the risk-free rate
+            and settings related to price models and fees.
 
     How to use it:
     1. Import the class
@@ -38,11 +46,7 @@ from Initialization import AlwaysBuyingPowerModel, BetaFillModel, TastyWorksFeeM
 
             # Add the underlying and the option chain to the algorithm
             self.context.structure.AddUnderlying(self, "SPX")
-"""
-
-
-class SetupBaseStructure:
-
+    """
     # Default parameters
     DEFAULT_PARAMETERS = {
         "creditStrategy": True,
@@ -61,13 +65,15 @@ class SetupBaseStructure:
         "emaMemory": 200,
     }
 
-    # Initialize the algorithm
-    # The context is the class that contains all the variables that are shared across the different classes
     def __init__(self, context):
-        # Store the context as a class variable
-        self.context = context
+        self.context = context # Store the context as a class variable
 
     def Setup(self):
+        """
+        Configures various components of the algorithm such as the logger, timer, brokerage model, and security initializer.
+        It sets default parameters and prepares the environment for trading. This method is typically called during the
+        algorithm's Initialize method.
+        """
         self.context.positions = {}
 
         # Set the logger
@@ -131,9 +137,13 @@ class SetupBaseStructure:
 
         return self
 
-    # Called every time a security (Option or Equity/Index) is initialized
     def CompleteSecurityInitializer(self, security: Security) -> None:
-        '''Initialize the security with raw prices'''
+        """
+        Initializes the security with raw prices. It is called every time a security (Option or Equity/Index) is initialized
+
+        Args:
+            security (Security): The security object to initialize.
+        """
         self.context.logger.debug(f"{self.__class__.__name__} -> CompleteSecurityInitializer -> Security: {security}")
         
         # Disable buying power on the security: https://www.quantconnect.com/docs/v2/writing-algorithms/live-trading/trading-and-orders#10-Disable-Buying-Power
@@ -178,6 +188,9 @@ class SetupBaseStructure:
     def ClearSecurity(self, security: Security) -> None:
         """
         Remove any additional data or settings associated with the security.
+    
+        Args:
+            security (Security): The security object to be cleared.
         """
         # Remove the security from the optionContractsSubscriptions dictionary
         if security.Symbol in self.context.optionContractsSubscriptions:
@@ -187,26 +200,35 @@ class SetupBaseStructure:
         self.context.RemoveSecurity(security.Symbol)
 
     def SetBacktestCutOffTime(self) -> None:
-        # Determine what is the last trading day of the backtest
+        """
+        Determines and sets the cutoff time for the backtest based on the algorithm's end date and market close time. This
+        is used to ensure that no trades occur after the specified cutoff time on the last trading day of the backtest.
+        """
         self.context.endOfBacktestCutoffDttm = None
         if hasattr(self.context, "EndDate") and self.context.EndDate is not None:
             self.context.endOfBacktestCutoffDttm = datetime.combine(self.context.lastTradingDay(self.context.EndDate), self.context.backtestMarketCloseCutoffTime)
 
     def AddConfiguration(self, parent=None, **kwargs) -> None:
         """
-        Dynamically add attributes to the self.context object.
-
-        :param parent: Parent object to which the attributes will be added.
-        :param kwargs: Keyword arguments containing attribute names and their values.
+        Adds configuration settings to the algorithm or a specified object within the algorithm. This method allows for
+        dynamic assignment of configuration parameters.
+        Args:
+            parent: Parent object to which the attributes will be added.
+            kwargs: Keyword arguments containing attribute names and their values.
         """
         parent = parent or self.context
         for attr_name, attr_value in kwargs.items():
             setattr(parent, attr_name, attr_value)
 
-    # Add the underlying and the option chain to the algorithm. We define the number of strikes left and right,
-    # the dte and the dte window. These parameters are used in the option chain filter function.
-    # @param ticker [string]
     def AddUnderlying(self, strategy, ticker):
+        """
+        Adds an underlying asset and its associated options chain to the algorithm. This is a crucial step in setting up
+        an options trading strategy.
+
+        Args:
+            strategy (object): The trading strategy that requires an underlying asset.
+            ticker (str): The ticker symbol of the underlying asset to be added.
+        """
         self.context.strategies.append(strategy)
         # Store the algorithm base variables
         strategy.ticker = ticker
@@ -251,6 +273,14 @@ class SetupBaseStructure:
         return self
 
     def AddConsolidators(self, symbol, minutes=5):
+        """
+        Adds a consolidator to the algorithm for a specific symbol. Consolidators help in managing data resolution and
+        ensuring that the algorithm processes data at the required frequency.
+
+        Args:
+            symbol (Symbol): The symbol for which the consolidator is to be added.
+            minutes (int): The time interval, in minutes, for the consolidator.
+        """
         consolidator = TradeBarConsolidator(timedelta(minutes=minutes))
         # Subscribe to the DataConsolidated event
         consolidator.DataConsolidated += self.onDataConsolidated
@@ -258,6 +288,14 @@ class SetupBaseStructure:
         self.context.consolidators[symbol] = consolidator
 
     def onDataConsolidated(self, sender, bar):
+        """
+        Handles data consolidation events. This method is triggered whenever new consolidated data is available and
+        ensures that the algorithm processes this data appropriately.
+
+        Args:
+            sender (object): The sender of the event.
+            bar (TradeBar): The consolidated data.
+        """
         for strategy in self.context.strategies:
             # We don't have the underlying added yet, so we can't get the price.
             if strategy.underlyingSymbol == None:
@@ -270,21 +308,8 @@ class SetupBaseStructure:
     # NOTE: this is not needed anymore as we have another method in alpha that handles it.
     def MarketOpenStructure(self):
         """
-        The MarketOpenStructure method is part of the SetupBaseStructure class, which is used to
-        set up the base structure of the algorithm in the main.py file. This specific method is
-        designed to be called at market open every day to update the price of the underlying
-        security. It first checks if the underlying symbol has been added to the context, and if
-        not, it returns without performing any action. If the underlying symbol is available, it
-        creates an instance of the Underlying class using the context and the symbol. Finally,
-        it updates the underlying price at the market open by calling the Price() method on the
-        Underlying instance.
-
-        Example:
-        Schedule the MarketOpenStructure method to be called at market open
-
-        self.Schedule.On(self.DateRules.EveryDay(), self.TimeRules.AfterMarketOpen(self.strategy.underlyingSymbol, 0), base_structure.MarketOpenStructure)
-
-        Other methods, like OnData, can now access the updated underlying price using self.context.underlyingPriceAtOpen
+        Executes tasks that need to be performed right after the market opens. This typically includes updating the
+        price of the underlying asset. This method is scheduled to run every market open day.
         """
         for strategy in self.context.strategies:
             # We don't have the underlying added yet, so we can't get the price.
@@ -294,9 +319,11 @@ class SetupBaseStructure:
             underlying = Underlying(self.context, strategy.underlyingSymbol)
             strategy.underlyingPriceAtOpen = underlying.Price()
 
-    # This just clears the workingOrders that are supposed to be expired or unfilled. It can happen when an order is not filled
-    # for it to stay in check until next day. This will clear that out. Similar method to the monitor one.
     def checkOpenPositions(self):
+        """
+        Periodically checks and manages open positions to ensure they are valid and handles any necessary cleanup or
+        adjustments based on the current market conditions or the positions' expiration status.
+        """
         self.context.executionTimer.start()
         # Iterate over all option contracts and remove the expired ones from the
         for symbol, security in self.context.Securities.items():
