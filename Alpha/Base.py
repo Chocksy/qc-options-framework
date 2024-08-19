@@ -7,37 +7,59 @@ from Alpha.Utils import Scanner, Order, Stats
 from Tools import ContractUtils, Logger, Underlying
 from Strategy import Leg, Position, OrderType, WorkingOrder
 
-"""
-NOTE: We can't use multiple inheritance in Python because this is a managed class. We will use composition instead so in
-      order to call the methods of SetupBaseStructure we'll call then using self.setup.methodName().
-----------------------------------------------------------------------------------------------------------------------------------------
-The base class for all the alpha models. It is used to setup the base structure of the algorithm and to run the strategies.
-This class has some configuration capabilities that can be used to setup the strategies more easily by just changing the
-configuration parameters.
 
-Here are the default values for the configuration parameters:
-
-    scheduleStartTime: time(9, 30, 0)
-    scheduleStopTime: None
-    scheduleFrequency: timedelta(minutes = 5)
-    maxActivePositions: 1
-    dte: 0
-    dteWindow: 0
-
-----------------------------------------------------------------------------------------------------------------------------------------
-The workflow of the algorithm is the following:
-
-    `Update` method gets called every minute
-        - If the market is closed, the algorithm exits
-        - If algorithm is warming up, the algorithm exits
-        - The Scanner class is used to filter the option chain
-            - If the chain is empty, the algorithm exits
-        - The CreateInsights method is called
-            - Inside the GetOrder method is called
-"""
+#NOTE: We can't use multiple inheritance in Python because this is a managed class. We will use composition instead so in
+# order to call the methods of SetupBaseStructure we'll call then using self.setup.methodName().
 
 
 class Base(AlphaModel):
+    """
+    TODO
+    The base class for all the alpha models. It is used to setup the base structure of the algorithm and to run the strategies.
+    This class has some configuration capabilities that can be used to setup the strategies more easily by just changing the
+    configuration parameters.
+
+    Attributes:
+        orderCount (int): Internal counter for all the orders.
+        DEFAULT_PARAMETERS (dict): Default configuration parameters for the strategy, including scheduling times, position limits, trade scheduling, and other trading parameters.
+
+    Methods:
+        __init__(context):
+            Initializes the Base class with the provided context and sets up necessary components such as logging, order management, and configuration.
+
+        getNextOrderId():
+            Generates a unique order ID for tracking and management.
+
+        getMergedParameters():
+            Merges default parameters with any class-specific settings.
+
+        parameter(key, default=None):
+            Retrieves a parameter value from the merged configuration settings.
+
+        update(algorithm: QCAlgorithm, data: Slice) -> List[Insight]:
+            Updates the model based on new data and checks for trade opportunities.
+
+        GetOrder(chain):
+            Abstract method to be implemented by subclasses to get the order details based on the option chain.
+
+        CreateInsights(chain, lastClosedOrderTag=None, data=Slice) -> List[Insight]:
+            Creates trading insights from filtered option chains.
+
+        buildOrderPosition(order, lastClosedOrderTag=None):
+            Builds a trading position from a given order specification.
+
+        hasDuplicateLegs(order):
+            Checks if an order has duplicate legs compared to currently open positions.
+
+        syncStats():
+            Synchronizes and updates statistical data for the trading model.
+
+        dataConsolidated(sender, consolidated):
+            Placeholder method for handling data consolidation events.
+
+        OnSecuritiesChanged(algorithm: QCAlgorithm, changes: SecurityChanges) -> None:
+            Handles changes in securities, including additions and removals.
+    """
     # Internal counter for all the orders
     orderCount = 0
 
@@ -174,38 +196,61 @@ class Base(AlphaModel):
 
     def __init__(self, context):
         self.context = context
-        # Set default name (use the class name)
-        self.name = type(self).__name__
-        # Set the Strategy Name (optional)
-        self.nameTag = self.name
-        # Set the logger
-        self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
+        self.name = type(self).__name__  # Set default name (use the class name)
+        self.nameTag = self.name # Set the Strategy Name (optional)
+        self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel) # Set the logger
         self.order = Order(context, self)
-        # This adds all the parameters to the class. We can also access them via self.parameter("parameterName")
-        self.context.structure.AddConfiguration(parent=self, **self.getMergedParameters())
-        # Initialize the contract utils
-        self.contractUtils = ContractUtils(context)
-        # Initialize the stats dictionary
-        # This will hold any details related to the underlying.
-        # For example, the underlying price at the time of opening of day
-        self.stats = Stats()
+        self.context.structure.AddConfiguration(parent=self, **self.getMergedParameters()) # This adds all the parameters to the class. We can also access them via self.parameter("parameterName")
+        self.contractUtils = ContractUtils(context) # Initialize the contract utils
+        self.stats = Stats() # Initialize the stats dictionary
         self.logger.debug(f'{self.name} -> __init__')
 
     @staticmethod
     def getNextOrderId():
+        """
+        Generates a unique order ID for tracking and management.
+
+        Returns:
+            int: A unique identifier for a new order.
+        """
         Base.orderCount += 1
         return Base.orderCount
 
     @classmethod
     def getMergedParameters(cls):
-        # Merge the DEFAULT_PARAMETERS from both classes
+        """
+        Merges default parameters with any class-specific settings.
+
+        Returns:
+            dict: A dictionary of merged parameters.
+        """
         return {**cls.DEFAULT_PARAMETERS, **getattr(cls, "PARAMETERS", {})}
 
     @classmethod
     def parameter(cls, key, default=None):
+        """
+        Retrieves a parameter value from the merged configuration settings.
+
+        Args:
+            key: The key of the parameter to retrieve.
+            default: The default value to return if the parameter key is not found.
+
+        Returns:
+            The value of the parameter if found; otherwise, returns the default value.
+        """
         return cls.getMergedParameters().get(key, default)
 
     def update(self, algorithm: QCAlgorithm, data: Slice) -> List[Insight]:
+        """
+        Updates the model based on new data and checks for trade opportunities.
+
+        Args:
+            algorithm: The algorithm instance to apply trading logic.
+            data: The data slice containing current market data.
+
+        Returns:
+            List[Insight]: Trading insights based on the updated model and data.
+        """
         insights = []
         # Start the timer
         self.context.executionTimer.start('Alpha.Base -> Update')
@@ -249,12 +294,25 @@ class Base(AlphaModel):
         self.context.executionTimer.stop('Alpha.Base -> Update')
         return Insight.Group(insights)
 
-    # Get the order with extra filters applied by the strategy
+
     def GetOrder(self, chain):
+        """
+        Get the order with extra filters applied by the strategy.
+        """
         raise NotImplementedError("GetOrder() not implemented")
 
-    # Previous method CreateOptionPosition.py#OpenPosition
     def CreateInsights(self, chain, lastClosedOrderTag=None, data = Slice) -> List[Insight]:
+        """
+        Creates trading insights from filtered option chains.
+
+        Args:
+            chain: Filtered list of option contracts.
+            lastClosedOrderTag: Tag from the last closed order to help manage dependencies.
+            data: Current market data slice.
+
+        Returns:
+            List[Insight]: Generated insights for trading based on the option chain.
+        """
         insights = []
         # Call the getOrder method of the class implementing OptionStrategy
         order = self.getOrder(chain, data)
@@ -303,7 +361,18 @@ class Base(AlphaModel):
         self.context.executionTimer.stop('Alpha.Base -> CreateInsights')
         return insights
 
+
     def buildOrderPosition(self, order, lastClosedOrderTag=None):
+        """
+        Builds a trading position from a given order specification.
+
+        Args:
+            order: The order details from which to build the position.
+            lastClosedOrderTag: Optional tag of a recently closed order for reference.
+
+        Returns:
+            tuple: Contains the newly created position and its associated working order.
+        """
         # Get the context
         context = self.context
 
@@ -449,7 +518,25 @@ class Base(AlphaModel):
 
         return [position, workingOrder]
 
+
     def hasDuplicateLegs(self, order):
+        """
+        Checks if an order has duplicate legs compared to currently open positions.
+
+        This method examines the provided order to see if it contains any legs that match the legs of currently open positions,
+        which could lead to duplicate trades. This check is only performed if duplication checks are enabled.
+
+        Args:
+            order (dict): The order details.
+            
+        Returns:
+            bool: True if the order contains duplicate legs compared to open positions, False otherwise.
+
+        Notes:
+            - This method only checks for duplicates if 'checkForDuplicatePositions' is enabled.
+            - The comparison is made based on the expiry date, strategy ID, and the specifics of the legs (strike and side).
+            - If 'allowMultipleEntriesPerExpiry' is False, it also checks that no multiple entries are made for the same expiry.
+        """
         # Check if checkForDuplicatePositions is enabled
         if not self.checkForDuplicatePositions:
             return False
@@ -461,15 +548,6 @@ class Base(AlphaModel):
         contracts = order["contracts"]
 
         openPositions = context.openPositions
-        """
-        workingOrders = context.workingOrders
-
-        # Get a list of orderIds from openPositions and workingOrders
-        orderIds = list(openPositions.keys()) + [workingOrder.orderId for workingOrder in workingOrders.values()]
-
-        # Iterate through the list of orderIds
-        for orderId in orderIds:
-        """
 
         # Iterate through open positions
         for orderTag, orderId in list(openPositions.items()):
@@ -492,10 +570,13 @@ class Base(AlphaModel):
 
         return False
 
-    """
-    This method is called every minute to update the stats dictionary.
-    """
+
     def syncStats(self):
+        """
+        Synchronizes and updates statistical data for the trading model.
+
+        Uses current market data to update statistics relevant to trading decisions, such as price thresholds and market conditions.
+        """
         # Get the current day
         currentDay = self.context.Time.date()
         # Update the underlyingPriceAtOpen to be set at the start of each day
@@ -525,16 +606,15 @@ class Base(AlphaModel):
         self.stats.highOfTheDay = max(self.stats.highOfTheDay, underlying.Close())
         self.stats.lowOfTheDay = min(self.stats.lowOfTheDay, underlying.Close())
 
-    # The method will be called each time a consolidator is receiving data. We have a default one of 5 minutes
-    # so if we need something to happen every 5 minutes this can be used for that.
+    
     def dataConsolidated(self, sender, consolidated):
         pass
-        
+
+
     def OnSecuritiesChanged(self, algorithm: QCAlgorithm, changes: SecurityChanges) -> None:
-        # Security additions and removals are pushed here.
-        # This can be used for setting up algorithm state.
-        # changes.AddedSecurities
-        # changes.RemovedSecurities
+        """
+        Handle changes in securities, including additions and removals.
+        """
         pass
 
 

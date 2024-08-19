@@ -4,16 +4,38 @@ from AlgorithmImports import *
 
 from Tools import ContractUtils, Logger, Underlying
 
-# Your New Python File
+
 class MarketOrderHandler:
+    """
+    Manages the execution of market orders.
+
+    This handler is responsible for processing and executing market orders for trading positions,
+    accommodating both individual and combination trades. It integrates with the order management system to execute orders based on dynamic market conditions and predefined
+    strategy parameters.
+
+    Attributes:
+        context: The trading context.
+        base: Base configuration for the handler.
+        logger (Logger): Utility for logging order processes and operations.
+        contractUtils (ContractUtils): Provides utilities for handling and processing contract-specific data and operations.
+    """
     def __init__(self, context, base):
         self.context = context
         self.base = base
         self.contractUtils = ContractUtils(context)
-        # Set the logger
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
 
     def call(self, position, order):
+        """
+        Processes and executes a market order for the specified trading position.
+        This method starts by updating and verifying the order details, adjusts based on the current market status,
+        and sends the order to the market. It logs all relevant order information.
+
+        Args:
+            position: The trading position for which the order is being placed.
+            order: The order details including order type and quantity.
+
+        """
         # Start the timer
         self.context.executionTimer.start()
 

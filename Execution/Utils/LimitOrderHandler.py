@@ -5,17 +5,32 @@ from AlgorithmImports import *
 from Tools import ContractUtils, Logger, Underlying, BSM
 
 
-# Your New Python File
 class LimitOrderHandler:
+    """
+    Handles the creation, management, and execution of limit orders based on position and market conditions.
+    This class is responsible for initializing limit order operations, including the set up of contract utilities
+    and logging configurations. It also utilizes the Black-Scholes-Merton (BSM) model for pricing analysis.
+    """
     def __init__(self, context, base):
         self.context = context
         self.contractUtils = ContractUtils(context)
         self.base = base
         self.bsm = BSM(context)
-        # Set the logger
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
 
     def call(self, position, order):
+        """
+        Processes limit orders for a given position based on the current market state and order details.
+        It manages order execution logic, including retries and order adjustments based on predefined intervals.
+
+        Args:
+            position: The trading position associated with the order, containing details like the current pricing, stats, and order configuration.
+            order: The order object containing specifics of the order to be executed.
+
+        Notes:
+            The method checks for necessary conditions to retry or cancel orders based on the last transaction attempt.
+            It ensures orders are adjusted and re-submitted within acceptable limits to prevent execution at undesirable prices.
+        """
         # Start the timer
         self.context.executionTimer.start()
 
@@ -40,11 +55,6 @@ class LimitOrderHandler:
 
         # Exit if we are not at the right scheduled interval
         if orderTransactionIds and (order.lastRetry is None or self.sinceLastRetry(context, order, timedelta(minutes = 1))):
-            """
-            IMPORTANT!!:
-            Why do we cancel?
-            If we update the ticket with the new price then we risk execution while updating the price of the rest of the combo order causing discrepancies.
-            """
             for id in orderTransactionIds:
                 ticket = context.Transactions.GetOrderTicket(id)
                 if ticket:
@@ -60,6 +70,14 @@ class LimitOrderHandler:
         self.context.executionTimer.stop()
 
     def makeLimitOrder(self, position, order, retry = False):
+        """
+        Creates a limit order or modifies an existing one.
+
+        Args:
+            position: The trading position associated with the order.
+            order: The order object containing specifics of the order to be executed.
+            retry: A boolean flag indicating if this method call is a retry to place the order after a previous failure.
+        """
         context = self.context
         # Get the Limit order details
         # Get the order type: open|close
@@ -159,6 +177,16 @@ class LimitOrderHandler:
             order.fillRetries += 1 # increment the number of fill tries
 
     def limitOrderPrice(self, order):
+        """
+        Calculates the limit order price.
+
+        Args:
+            order: The order object which contains order details.
+
+        Returns:
+            float: The calculated price for the limit order.
+
+        """
         orderType = order.orderType
         limitOrderPrice = order.limitOrderPrice
         # Just use a default limit price that is supposed to be the smallest prossible.
@@ -169,6 +197,17 @@ class LimitOrderHandler:
         return limitOrderPrice
 
     def sinceLastRetry(self, context, order, frequency = timedelta(minutes = 3)):
+        """
+        Determines if the specified time has elapsed since the last retry of an order.
+
+        Args:
+            context: The trading context.
+            order: The order object to check the last retry time against.
+            frequency: The timedelta object specifying the required elapsed time before another retry can be attempted.
+
+        Returns:
+            bool: True if the required time has elapsed since the last retry; False otherwise.
+        """
         if order.lastRetry is None: return True
 
         timeSinceLastRetry = context.Time - order.lastRetry
@@ -176,6 +215,18 @@ class LimitOrderHandler:
         return minutesSinceLastRetry % frequency == timedelta(minutes=0)
 
     def calculateAdjustmentValueSold(self, execOrder, limitOrderPrice, retries=0, nrContracts=1):
+        """
+        Calculates the adjustment value for an order based on its execution order details and the number of retries.
+
+        Args:
+            execOrder: The execution order object containing the current mid-price and bid-ask spread.
+            limitOrderPrice: The initial price limit for the order.
+            retries: The number of times the order has been retried.
+            nrContracts: The number of contracts involved in the order.
+
+        Returns:
+            float: The adjustment value to be applied to the order price.
+        """
         if self.base.orderAdjustmentPct is None and self.base.adjustmentIncrement is None:
             raise ValueError("orderAdjustmentPct or adjustmentIncrement must be set in the parameters")
 
@@ -211,6 +262,18 @@ class LimitOrderHandler:
         return adjustment_value
 
     def calculateAdjustmentValueBought(self, execOrder, limitOrderPrice, retries=0, nrContracts=1):
+        """
+        Calculates the adjustment value for an order based on its execution order details and the number of retries.
+
+        Args:
+            execOrder: The execution order object containing the current mid-price and bid-ask spread.
+            limitOrderPrice: The initial price limit for the order.
+            retries: The number of times the order has been retried.
+            nrContracts: The number of contracts involved in the order.
+
+        Returns:
+            float: The adjustment value to be applied to the order price.
+        """
         if self.base.orderAdjustmentPct is None and self.base.adjustmentIncrement is None:
             raise ValueError("orderAdjustmentPct or adjustmentIncrement must be set in the parameters")
 

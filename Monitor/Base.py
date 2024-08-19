@@ -8,6 +8,14 @@ from Tools import Underlying
 
 
 class Base(RiskManagementModel):
+    """
+    Manages risk for a trading algorithm by evaluating open positions against risk management criteria such as stop-loss, profit targets,
+    and position expiration. Implements the `RiskManagementModel` interface required by QuantConnect.
+
+    Attributes:
+        context (object): An object containing contextual information and utility methods for the algorithm.
+        DEFAULT_PARAMETERS (dict): Default risk parameters including management frequency, profit targets, and stop-loss multipliers.
+    """
     DEFAULT_PARAMETERS = {
         # The frequency (in minutes) with which each position is managed
         "managePositionFrequency": 1,
@@ -40,16 +48,49 @@ class Base(RiskManagementModel):
 
     @classmethod
     def getMergedParameters(cls):
-        # Merge the DEFAULT_PARAMETERS from both classes
+        """
+        Merges default parameters with any additional parameters defined in derived classes.
+
+        Returns:
+            dict: A dictionary containing the merged parameters.
+        """
         return {**cls.DEFAULT_PARAMETERS, **getattr(cls, "PARAMETERS", {})}
 
     @classmethod
     def parameter(cls, key, default=None):
+        """
+        Retrieves the value of a parameter by its key, returning a default value if the key is not found.
+
+        Args:
+            key (str): The parameter key to retrieve.
+            default (any): The default value to return if the key is not found.
+
+        Returns:
+            The value of the parameter or the default value if the key is not present.
+        """
         return cls.getMergedParameters().get(key, default)
 
-    # @param algorithm [QCAlgorithm] The algorithm argument that the methods receive is an instance of the base QCAlgorithm class, not your subclass of it.
-    # @param targets [List[PortfolioTarget]] The list of targets to be ordered
     def ManageRisk(self, algorithm: QCAlgorithm, targets: List[PortfolioTarget]) -> List[PortfolioTarget]:
+        """
+        Manages the risk of the current open positions and determines which positions, if any, should be closed based on various risk management criteria.
+
+        This method overrides the provided `targets` with a new list of portfolio targets based on the evaluation of current open positions. The method checks the positions against multiple risk thresholds such as stop loss, profit target, days in trade (DIT), and days to expiration (DTE), among others.
+        
+        The method follows these steps:
+            1. Checks if the current time aligns with the specified schedule (`managePositionFrequency`). If not, it returns an empty list.
+            2. Calls `preManageRisk` for any preprocessing required by child classes.
+            3. Iterates through all open positions, evaluating each against risk criteria such as stop loss, profit target, DIT/DTE thresholds, expiration date, and custom conditions.
+            4. For positions that meet closure criteria, it updates the targets list to close these positions.
+            5. Stops the execution timer and returns the updated list of targets.
+
+        Args:
+            algorithm (QCAlgorithm): An instance of the base QCAlgorithm class that provides access to the algorithm's state, including portfolio, securities, and time.
+            targets (List[PortfolioTarget]): A list of portfolio targets that may be adjusted based on risk management criteria.
+
+        Returns:
+            List[PortfolioTarget]: A list of portfolio targets that have been updated based on the risk management assessment. Positions that need to be closed will be included in this list.
+        """
+
         # Start the timer
         self.context.executionTimer.start('Monitor.Base -> ManageRisk')
         # We are basically ignoring the current portfolio targets to be assessed for risk
@@ -188,25 +229,12 @@ class Base(RiskManagementModel):
 
         return targets
 
-    """
-    Method to allow child classes access to the manageRisk method before any changes are made
-    """
     def preManageRisk(self):
         pass
 
-    """
-    Special method to monitor the position and handle custom actions on it.
-    These actions can be:
-    - add a working order to open a hedge position to defend the current one
-    - add a working order to increase the size of the position to improve avg price
-    """
     def monitorPosition(self, position):
         pass
 
-    """
-    Another special method that should be ovewritten by child classes.
-    This method can look for indicators or other decisions to close the position.
-    """
     def shouldClose(self, position):
         pass
 
@@ -217,6 +245,15 @@ class Base(RiskManagementModel):
             return False
 
     def checkStopLoss(self, position):
+        """
+        Evaluates if a position has hit its stop loss threshold and needs to be closed.
+
+        Args:
+            position: The position to evaluate.
+
+        Returns:
+            bool: True if the stop loss condition is met, False otherwise.
+        """
         # Get the Stop Loss multiplier
         stopLossMultiplier = self.stopLossMultiplier
         capStopLoss = self.capStopLoss
@@ -256,6 +293,15 @@ class Base(RiskManagementModel):
         return stopLossFlg
 
     def checkProfitTarget(self, position):
+        """
+        Determines if a position has reached its profit target and can be closed.
+
+        Args:
+            position: The position to check.
+
+        Returns:
+            bool: True if the profit target is met, False otherwise.
+        """
         # Get the amount of credit received to open the position
         openPremium = position.openOrder.premium
         # Extract the positionPnL (per share)
@@ -279,6 +325,15 @@ class Base(RiskManagementModel):
 
 
     def checkDitThreshold(self, position):
+        """
+        Checks if the position has been held longer than the allowed Days in Trade (DIT) threshold.
+
+        Args:
+            position: The position to evaluate.
+
+        Returns:
+            tuple: A tuple containing two booleans (hardDitStopFlg, softDitStopFlg) indicating if the hard or soft DIT thresholds have been met.
+        """
         # Get the book position
         bookPosition = self.context.allPositions[position.orderId]
         # How many days has this position been in trade for
@@ -311,6 +366,15 @@ class Base(RiskManagementModel):
         return hardDitStopFlg, softDitStopFlg
 
     def checkDteThreshold(self, position):
+        """
+        Checks if the position is approaching or has reached its Days to Expiration (DTE) threshold and needs to be closed.
+
+        Args:
+            position: The position to evaluate.
+
+        Returns:
+            tuple: A tuple containing two booleans (hardDteStopFlg, softDteStopFlg) indicating if the hard or soft DTE thresholds have been met.
+        """
         hardDteStopFlg = False
         softDteStopFlg = False
         # Extract the positionPnL (per share)
@@ -335,11 +399,28 @@ class Base(RiskManagementModel):
         return hardDteStopFlg, softDteStopFlg
 
     def checkEndOfBacktest(self):
+        """
+        Verifies if the current simulation time has reached or passed the designated end time for the backtest.
+
+        Returns:
+            bool: True if the current time has reached or exceeded the end of backtest time, False otherwise.
+        """
         if self.context.endOfBacktestCutoffDttm is not None and self.context.Time >= self.context.endOfBacktestCutoffDttm:
             return True
         return False
 
     def closePosition(self, position, closeReason, stopLossFlg=False):
+        """
+        Closes a position based on specific criteria or conditions, such as hitting a stop loss or reaching a profit target.
+
+        Args:
+            position: The position to close.
+            closeReason: The reason for closing the position.
+            stopLossFlg: A flag indicating if the position is being closed due to a stop loss.
+
+        Returns:
+            list: A list of new or modified portfolio targets as a result of closing the position.
+        """
         # Start the timer
         self.context.executionTimer.start()
 

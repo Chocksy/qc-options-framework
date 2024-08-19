@@ -5,8 +5,29 @@ from AlgorithmImports import *
 from Tools import ContractUtils, Logger, Underlying, BSM
 
 
-# Your New Python File
 class LimitOrderHandlerWithCombo:
+    """
+    Handles the management and execution of limit orders for multi-leg options strategies, including both single and combo orders.
+
+    Attributes:
+        context (QuantConnect.Algorithm.QCAlgorithm): The algorithm instance, providing methods and properties for algorithm management.
+        base: Base configuration object that includes global settings for the order handler.
+        contractUtils (ContractUtils): Utility class for managing and retrieving data about financial contracts.
+        logger (Logger): Provides logging functionality to record the operational process and outputs.
+        bsm (BSM): Black-Scholes-Merton model used for options pricing and risk management calculations.
+        
+    Methods:
+        call(self, position, order): Initiates the processing of limit orders for a given trading position based on the current market and position state.
+        makeLimitOrder(self, position, order, retry=False): Processes and sends out new limit orders or updates existing ones based on the strategy’s requirements.
+        updateComboLimitOrder(self, position, order, orderTransactionIds): Updates existing combo limit orders with new pricing information as market conditions change.
+        calculateNewLimitPrice(self, position, execOrder, limitOrderPrice, retries, nrContracts, orderType): Calculates a new price for limit orders, factoring in market shifts and strategy-defined adjustments.
+        logOrderDetails(self, position, order): Logs detailed information about orders being processed to aid in debugging and monitoring.
+        logOrderExecution(self, position, order, newLimitPrice, action=None): Records the execution details of orders to track their progression and outcomes.
+        limitOrderPrice(self, order): Retrieves or calculates the appropriate limit price for an order based on its characteristics.
+        sinceLastRetry(self, context, order, frequency=timedelta(minutes=3)): Checks whether the specified time has passed since the last order operation to control the timing of retries.
+        calculateAdjustmentValueSold(self, execOrder, limitOrderPrice, retries=0, nrContracts=1): Calculates adjustment values for selling strategies to optimize order pricing.
+        calculateAdjustmentValueBought(self, execOrder, limitOrderPrice, retries=0, nrContracts=1): Calculates adjustment values for buying strategies to optimize order pricing.
+    """
     def __init__(self, context, base):
         self.context = context
         self.contractUtils = ContractUtils(context)
@@ -16,6 +37,14 @@ class LimitOrderHandlerWithCombo:
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
 
     def call(self, position, order):
+        """
+        Executes the main logic to handle limit orders based on the current state of the position and order details.
+        This function initiates either the creation of a new limit order or updates an existing one, depending on the presence of transaction IDs.
+
+        Args:
+            position (Position): The trading position associated with the order.
+            order (Order): The order details including order type and transaction information.
+        """
         # Start the timer
         self.context.executionTimer.start()
 
@@ -48,6 +77,16 @@ class LimitOrderHandlerWithCombo:
         self.context.executionTimer.stop()
 
     def makeLimitOrder(self, position, order, retry = False):
+        """
+        Creates or updates limit orders for trading positions. This method calculates the new limit price
+        and sends out the order to the market. If retry is True, it means the method is attempting to update
+        or resend an order that might not have been filled previously.
+
+        Args:
+            position (Position): The trading position associated with the order.
+            order (Order): The order details including order type and transaction information.
+            retry (bool): Indicates if this order creation is an attempt to retry after a failed or unfilled previous attempt.
+        """
         context = self.context
         orderType = order.orderType
         limitOrderPrice = self.limitOrderPrice(order)
@@ -95,6 +134,15 @@ class LimitOrderHandlerWithCombo:
             order.fillRetries += 1
 
     def updateComboLimitOrder(self, position, order, orderTransactionIds):
+        """
+        Updates an existing combo limit order with a new limit price based on updated market conditions or strategy adjustments.
+        This method is typically called when an existing order needs a price update to improve the likelihood of execution.
+
+        Args:
+            position (Position): The trading position associated with the order.
+            order (Order): The order details including the type and current transaction IDs.
+            orderTransactionIds (list): A list of transaction IDs for the existing order to be updated.
+        """
         context = self.context
         orderType = order.orderType
         execOrder = position[f"{orderType}Order"]
@@ -124,6 +172,21 @@ class LimitOrderHandlerWithCombo:
         order.fillRetries += 1  # increment the number of fill tries
 
     def calculateNewLimitPrice(self, position, execOrder, limitOrderPrice, retries, nrContracts, orderType):
+        """
+        Calculates a new limit price for an order based on execution order details, retry count, and number of contracts.
+        The calculation considers whether the order is for opening or closing a position and adjusts the price accordingly.
+
+        Args:
+            position (Position): The trading position associated with the order.
+            execOrder (ExecutionOrder): The current execution order details.
+            limitOrderPrice (float): The original limit price set for the order.
+            retries (int): The number of times the order has been retried.
+            nrContracts (int): The number of contracts involved in the order.
+            orderType (str): The type of order, either 'open' or 'close'.
+
+        Returns:
+            float: The newly calculated limit price for the order.
+        """
         if orderType == "close":
             adjustmentValue = self.calculateAdjustmentValueBought(
                 execOrder=execOrder,
@@ -163,6 +226,14 @@ class LimitOrderHandlerWithCombo:
         return newLimitPrice
 
     def logOrderDetails(self, position, order):
+        """
+        Logs detailed information about an order including its type, associated position details,
+        and pricing information. This method aids in debugging and monitoring the order processing lifecycle.
+
+        Args:
+            position (Position): The trading position associated with the order.
+            order (Order): The order details including the type and transaction information.
+        """
         orderType = order.orderType
         execOrder = position[f"{orderType}Order"]
         contracts = [v.contract for v in position.legs]
@@ -177,6 +248,16 @@ class LimitOrderHandlerWithCombo:
         self.logger.debug(f" - bidAskSpread: {execOrder.bidAskSpread}")
 
     def logOrderExecution(self, position, order, newLimitPrice, action=None):
+        """
+        Logs the execution details of an order after it has been placed or updated. This includes the action taken (open/close),
+        the new limit price, and any other relevant execution parameters.
+
+        Args:
+            position (Position): The trading position associated with the order.
+            order (Order): The order details.
+            newLimitPrice (float): The limit price at which the order was executed.
+            action (str, optional): A description of the action taken, typically 'OPEN' or 'CLOSE'.
+        """
         orderType = order.orderType
         execOrder = position[f"{orderType}Order"]
         contracts = [v.contract for v in position.legs]
@@ -203,6 +284,15 @@ class LimitOrderHandlerWithCombo:
         self.logger.info(log_message)
 
     def limitOrderPrice(self, order):
+        """
+        Retrieves or determines the appropriate limit price for an order based on its characteristics and the current market conditions.
+
+        Args:
+            order (Order): The order for which the limit price is needed.
+
+        Returns:
+            float: The determined limit price for the order.
+        """
         orderType = order.orderType
         limitOrderPrice = order.limitOrderPrice
         # Just use a default limit price that is supposed to be the smallest prossible.
@@ -213,6 +303,18 @@ class LimitOrderHandlerWithCombo:
         return limitOrderPrice
 
     def sinceLastRetry(self, context, order, frequency = timedelta(minutes = 3)):
+        """
+        Checks if the specified frequency duration has passed since the last retry of an order.
+        This helps in managing the retry mechanism by ensuring a minimum wait time between retries.
+
+        Args:
+            context (QuantConnect.Algorithm.QCAlgorithm): The trading algorithm context.
+            order (Order): The order for which the retry timing is being checked.
+            frequency (timedelta, optional): The minimum time that should elapse before another retry is attempted.
+
+        Returns:
+            bool: True if the required time has passed since the last retry, False otherwise.
+        """
         if order.lastRetry is None: return True
 
         timeSinceLastRetry = context.Time - order.lastRetry
@@ -220,6 +322,19 @@ class LimitOrderHandlerWithCombo:
         return minutesSinceLastRetry % frequency == timedelta(minutes=0)
 
     def calculateAdjustmentValueSold(self, execOrder, limitOrderPrice, retries=0, nrContracts=1):
+        """
+        Calculates an adjustment value for a sold order based on its current execution details, limit order price, retry count, and contract number.
+        This value is used to modify the limit price in an attempt to optimize the order's market execution potential.
+
+        Args:
+            execOrder (ExecutionOrder): The current execution order details.
+            limitOrderPrice (float): The original limit price set for the order.
+            retries (int): The number of times the order has been retried.
+            nrContracts (int): The number of contracts involved in the order.
+
+        Returns:
+            float: The adjustment value to be applied to the order's limit price.
+        """
         if self.base.orderAdjustmentPct is None and self.base.adjustmentIncrement is None:
             raise ValueError("orderAdjustmentPct or adjustmentIncrement must be set in the parameters")
 
@@ -257,6 +372,19 @@ class LimitOrderHandlerWithCombo:
         return adjustment_value
 
     def calculateAdjustmentValueBought(self, execOrder, limitOrderPrice, retries=0, nrContracts=1):
+        """
+        Calculates an adjustment value for a bought order similar to the sold order adjustment, but with considerations specific to purchasing scenarios.
+        This includes modifying the limit order price upwards or downwards to enhance execution likelihood based on retries and market conditions.
+
+        Args:
+            execOrder (ExecutionOrder): The current execution order details.
+            limitOrderPrice (float): The original limit price set for the order.
+            retries (int): The number of times the order has been retried.
+            nrContracts (int): The number of contracts involved in the order.
+
+        Returns:
+            float: The adjustment value to be applied to the order's limit price.
+        """
         if self.base.orderAdjustmentPct is None and self.base.adjustmentIncrement is None:
             raise ValueError("orderAdjustmentPct or adjustmentIncrement must be set in the parameters")
 

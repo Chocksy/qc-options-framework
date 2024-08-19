@@ -15,7 +15,25 @@ from Tools import Helper, ContractUtils, Logger, Underlying
 Use it like this:
 
 position_key = "some_key"  # Replace with an appropriate key
-position_data = Position(orderId="12345", orderTag="SPX_Put", Strategy="CreditPutSpread", StrategyTag="CPS", expiryStr="20220107", openDttm="2022-01-07 09:30:00", openDt="2022-01-07", openDTE=0, targetPremium=500, orderQuantity=1, maxOrderQuantity=5, openOrderMidPrice=10.0, openOrderMidPriceMin=9.0, openOrderMidPriceMax=11.0, openOrderBidAskSpread=1.0, openOrderLimitPrice=10.0, underlyingPriceAtOpen=4500.0)
+position_data = Position(
+                    orderId="12345", 
+                    orderTag="SPX_Put", 
+                    Strategy="CreditPutSpread", 
+                    StrategyTag="CPS", 
+                    expiryStr="20220107", 
+                    openDttm="2022-01-07 09:30:00", 
+                    openDt="2022-01-07", 
+                    openDTE=0, 
+                    targetPremium=500, 
+                    orderQuantity=1, 
+                    maxOrderQuantity=5, 
+                    openOrderMidPrice=10.0,
+                    openOrderMidPriceMin=9.0, 
+                    openOrderMidPriceMax=11.0, 
+                    openOrderBidAskSpread=1.0, 
+                    openOrderLimitPrice=10.0, 
+                    underlyingPriceAtOpen=4500.0
+                    )
 
 # Create Leg objects for sold and bought options
 sold_put_leg = Leg(leg_type="SoldPut", option_symbol="SPXW220107P4500", quantity=-1, strike=4500, expiry="20220107")
@@ -30,6 +48,10 @@ self.positions[position_key] = position_data
 
 @dataclass
 class _ParentBase:
+    """
+    Acts as a utility base class for dataclass instances, enabling attribute access via both dot notation and dictionary-like key access.
+    It also provides a custom representation that omits fields with default values to simplify debugging and logging outputs.
+    """
     # With the __getitem__ and __setitem__ methods here we are transforming the
     # dataclass into a regular dict. This method is to allow getting fields using ["field"]
     def __getitem__(self, key):
@@ -55,10 +77,12 @@ class _ParentBase:
 
         nodef_f_repr = ", ".join(f"{name}={value}" for name, value in nodef_f_vals)
         return f"{self.__class__.__name__}({nodef_f_repr})"
-    
-    # recursive method that checks the fields of each dataclass and calls asdict if we have another dataclass referenced
-    # otherwise it just builds a dictionary and assigns the values and keys.
+
     def asdict(self):
+        """
+        Recursive method that checks the fields of each dataclass and calls asdict if we have another dataclass referenced
+        otherwise it just builds a dictionary and assigns the values and keys.
+        """
         result = {}
         for f in dataclasses.fields(self):
             fieldValue = attrgetter(f.name)(self)
@@ -78,6 +102,23 @@ class _ParentBase:
 
 @dataclass
 class WorkingOrder(_ParentBase):
+    """
+    Represents an order in the trading system, tracking its execution state, associated strategy, and other metadata necessary for managing trading actions.
+
+    Attributes:
+        positionKey (str): A unique key identifying the position associated with this order.
+        insights (List[Insight]): Insights generated that led to this order.
+        targets (List[PortfolioTarget]): Targets detailing the desired state of the portfolio following this order.
+        orderId (str): Unique identifier for the order.
+        strategy (str): Name of the strategy implementation governing this order.
+        strategyTag (str): Tag associated with the strategy for identification.
+        orderType (str): Type of order, e.g., 'limit', 'market'.
+        fills (int): Number of fills that have occurred for this order.
+        useLimitOrder (bool): Whether a limit order is used.
+        limitOrderPrice (float): The price at which the limit order is set.
+        lastRetry (Optional[datetime.date]): Date of the last retry attempt for this order.
+        fillRetries (int): Number of retry attempts to fill this order.
+    """
     positionKey: str = ""
     insights: List[Insight] = field(default_factory=list)
     targets: List[PortfolioTarget] = field(default_factory=list)
@@ -93,6 +134,18 @@ class WorkingOrder(_ParentBase):
 
 @dataclass
 class Leg(_ParentBase):
+    """
+    Represents a single leg of a trading position, detailing the specific contract and its characteristics used in the position.
+
+    Attributes:
+        key (str): A unique identifier for the leg within its position.
+        expiry (Optional[datetime.date]): Expiration date of the option contract.
+        contractSide (int): Side of the contract, indicating whether it is a buy or sell.
+        symbol (str): Symbol of the contract.
+        quantity (int): Number of contracts in the leg.
+        strike (float): Strike price of the option.
+        contract (OptionContract): The actual option contract object.
+    """
     key: str = ""
     expiry: Optional[datetime.date] = None
     contractSide: int = 0  # TODO: this one i think would be the one to use instead of self.contractSide
@@ -125,6 +178,27 @@ class Leg(_ParentBase):
 
 @dataclass
 class OrderType(_ParentBase):
+    """
+    Encapsulates details about a specific type of order within a trading position, such as a limit order used for opening or closing positions.
+
+    Attributes:
+        premium (float): Premium of the order.
+        fills (int): Number of times the order has been filled.
+        limitOrderExpiryDttm (str): Expiry date and time of the limit order.
+        limitOrderPrice (float): Price at which the limit order is set.
+        bidAskSpread (float): Bid-ask spread at the time of the order.
+        midPrice (float): Mid price at the time of the order.
+        midPriceMin (float): Minimum mid price recorded for the order.
+        midPriceMax (float): Maximum mid price recorded for the order.
+        limitPrice (float): Limit price for the order if different from limitOrderPrice.
+        fillPrice (float): Price at which the order was filled.
+        openPremium (float): Premium of the order when opened.
+        stalePrice (bool): Indicates if the current price is considered stale.
+        filled (bool): Whether the order has been completely filled.
+        maxLoss (float): Maximum loss expected from the order.
+        transactionIds (List[int]): List of transaction IDs associated with the order.
+        priceProgressList (List[float]): List of prices documenting the price progression of the order.
+    """
     premium: float = 0.0
     fills: int = 0
     limitOrderExpiryDttm: str = ""
@@ -145,7 +219,38 @@ class OrderType(_ParentBase):
 @dataclass
 class Position(_ParentBase):
     """
-    The position class should have a structure to hold data and attributes that define it's functionality. Like what the target premium should be or what the slippage should be.
+    Represents a trading position, detailing its strategy, associated orders, and lifecycle metrics.
+
+    Attributes:
+        orderId (str): Identifier for the position's order.
+        orderTag (str): Tag associated with the order for easy identification.
+        strategy (str): Strategy class name associated with the position.
+        strategyTag (str): Tag for the strategy used.
+        strategyId (str): Identifier for the strategy type, e.g., 'PutCreditSpread'.
+        expiryStr (str): String representation of the expiry date.
+        expiry (Optional[datetime.date]): Actual expiry date of the position.
+        linkedOrderTag (str): Tag linked to other related orders or positions.
+        targetPremium (float): Target premium aimed for the position.
+        orderQuantity (int): Quantity of orders placed for the position.
+        maxOrderQuantity (int): Maximum allowable order quantity for this position.
+        targetProfit (Optional[float]): Target profit for the position.
+        legs (List[Leg]): List of 'Leg' instances representing each leg of the position.
+        contractSide (Dict[str, int]): Mapping of contract symbols to their sides (buy/sell).
+
+        # Lifecycle attributes
+        openOrder (OrderType): Order details at the position opening.
+        closeOrder (OrderType): Order details at the position closing.
+        openDttm (str): DateTime at which the position was opened.
+        openDt (str): Date at which the position was opened.
+        openDTE (int): Days to expiry at the time of position opening.
+        openOrderMidPrice (float): Mid price of the order at opening.
+        openOrderMidPriceMin (float): Minimum recorded mid price at opening.
+        openOrderMidPriceMax (float): Maximum recorded mid price at opening.
+        openOrderBidAskSpread (float): Bid-ask spread at the time of position opening.
+        openOrderLimitPrice (float): Limit price of the order at opening.
+        openPremium (float): Premium of the order at opening.
+        underlyingPriceAtOpen (float): Price of the underlying asset at the time of opening.
+        ... additional attributes documenting changes and status through the position's lifecycle.
     """
     # These are structural attributes that never change.
     orderId: str = "" # Ex: 1
@@ -236,17 +341,19 @@ class Position(_ParentBase):
 
     def strategyParam(self, parameter_name):
         """
-        // Create a Position instance
-        pos = Position(
-            orderId="123",
-            orderTag="ABC",
-            strategy="TestAlphaModel",
-            strategyTag="XYZ",
-            expiryStr="2023-12-31"
-        )
+        Creates a Position instance.
 
-        // Get targetProfit parameter from the position's strategy
-        print(pos.strategyParam('targetProfit'))  // 0.5
+        Example:
+            pos = Position(
+                orderId="123",
+                orderTag="ABC",
+                strategy="TestAlphaModel",
+                strategyTag="XYZ",
+                expiryStr="2023-12-31"
+            )
+
+        Get targetProfit parameter from the position's strategy
+            print(pos.strategyParam('targetProfit'))  // 0.5
         """
         return self.strategyModule().parameter(parameter_name)
 
@@ -260,6 +367,13 @@ class Position(_ParentBase):
 
     # Slippage used to set Limit orders
     def getPositionValue(self, context):
+        """
+        Calculates and updates the position's value based on the current market conditions and the defined slippage for each leg in the position. It also validates the bid-ask spread to ensure it's not excessively wide.
+        This method also updates several attributes related to the position's market value, including the order mid-price, limit order price, bid-ask spread, and position P&L.
+
+        Args:
+            context: The trading context which provides necessary utilities and parameters.
+        """
         # Start the timer
         context.executionTimer.start()
         contractUtils = ContractUtils(context)
@@ -312,12 +426,27 @@ class Position(_ParentBase):
         context.executionTimer.stop()
 
     def updateStats(self, context, orderType):
+        """
+        Updates statistics for the position based on the current market data. This includes updating the price of the underlying at the time of submitting the order.
+
+        Args:
+            context: The trading context which provides access to market data.
+            orderType (str): The type of the order ('open' or 'close') which indicates at which stage the stats are being updated.
+        """
         underlying = Underlying(context, self.underlyingSymbol())
         # If we do use combo orders then we might not need to do this check as it has the midPrice in there.
         # Store the price of the underlying at the time of submitting the Market Order
         self[f"underlyingPriceAt{orderType.title()}"] = underlying.Close()
 
     def updateOrderStats(self, context, orderType):
+        """
+        Updates various statistical and financial metrics for the order based on its type and the current market data. 
+        
+        Args:
+            context: The trading context providing market data and utilities.
+            orderType (str): Indicates whether the stats are for opening or closing the order.
+
+        """
         # Start the timer
         context.executionTimer.start()
 
@@ -421,6 +550,13 @@ class Position(_ParentBase):
         context.executionTimer.stop()
 
     def updatePnLRange(self, currentDate, positionPnL):
+        """
+        Updates the profit and loss (P&L) range for the position based on its performance on the given date. This includes recording the highest and lowest P&L and the days in trade when these occurred.
+
+        Args:
+            currentDate (datetime): The current date for which the P&L is being updated.
+            positionPnL (float): The P&L of the position on the current date.        
+        """
         # How many days has this position been in trade for
         # currentDit = (self.context.Time.date() - bookPosition.openFilledDttm.date()).days
         currentDit = (currentDate - self.openFilledDttm.date()).days
@@ -433,14 +569,38 @@ class Position(_ParentBase):
             self.PnLMax = max(self.PnLMax, 100 * positionPnL)
 
     def expiryLastTradingDay(self, context):
-        # Get the last trading day for the given expiration date (in case it falls on a holiday)
+        """
+        Determines the last trading day before the position's expiry date, considering holidays and other non-trading days.
+
+        Args:
+            context: The trading context which includes calendar and scheduling utilities.
+
+        Returns:
+            datetime: The last possible trading day before the position's expiry.
+        """
         return context.lastTradingDay(self.expiry)
 
     def expiryMarketCloseCutoffDttm(self, context):
-        # Set the date/time threshold by which the position must be closed (on the last trading day before expiration)
+        """
+        Calculates the exact datetime by which a position must be closed on its last trading day to adhere to market or strategy-specific rules.
+
+        Args:
+            context: The trading context which includes timing and scheduling utilities.
+
+        Returns:
+            datetime: The cutoff datetime on the last trading day before the position's expiry.
+        """
         return datetime.combine(self.expiryLastTradingDay(context), self.strategyParam("marketCloseCutoffTime"))
 
     def cancelOrder(self, context, orderType = 'open', message = ''):
+        """
+        Cancels an order associated with this position, typically due to expiration or failure to fill within the expected timeframe. It logs the cancellation and updates relevant statistics.
+
+        Args:
+            context: The trading context which provides access to transaction management.
+            orderType (str): Specifies the type of order ('open' or 'close') being cancelled.
+            message (str): A message explaining the reason for the cancellation.
+        """
         self.orderCancelled = True
         execOrder = self[f"{orderType}Order"]
         orderTransactionIds = execOrder.transactionIds
