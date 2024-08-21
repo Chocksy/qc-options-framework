@@ -3,10 +3,9 @@ from AlgorithmImports import *
 #endregion
 
 from Initialization import SetupBaseStructure
-from Alpha.Utils import Scanner, Order, Stats
+from Alpha.Utils import Scanner, Stats
 from Tools import ContractUtils, Logger, Underlying
 from Strategy import Leg, Position, OrderType, WorkingOrder
-
 
 #NOTE: We can't use multiple inheritance in Python because this is a managed class. We will use composition instead so in
 # order to call the methods of SetupBaseStructure we'll call then using self.setup.methodName().
@@ -75,6 +74,8 @@ class Base(AlphaModel):
         "minimumTradeScheduleDistance": timedelta(days=1),
         # If True, the order is not placed if the legs are already part of an existing position.
         "checkForDuplicatePositions": True,
+        # If True, the order is not placed if even one leg is in an existing position.
+        "checkForOneDuplicateLeg": True,
         # Maximum number of open positions at any given time
         "maxActivePositions": 1,
         # Maximum number of open orders (not filled) at any given time
@@ -316,6 +317,9 @@ class Base(AlphaModel):
         insights = []
         # Call the getOrder method of the class implementing OptionStrategy
         order = self.getOrder(chain, data)
+
+        self.context.debug(str(order))
+
         # Execute the order
         # Exit if there is no order to process
         if order is None:
@@ -331,17 +335,15 @@ class Base(AlphaModel):
         for o in order:
             self.logger.debug(f"CreateInsights -> strategyId: {o['strategyId']}, strikes: {o['strikes']}")
 
-        for single_order in order:
-            position, workingOrder = self.buildOrderPosition(single_order, lastClosedOrderTag)
+        for single_order in order: 
+            position, workingOrder = self.context.ordering.buildOrderPosition(single_order, lastClosedOrderTag)
+            
+
             self.logger.debug(f"CreateInsights -> position: {position}")
             self.logger.debug(f"CreateInsights -> workingOrder: {workingOrder}")
             if position is None:
                 continue
-
-            if self.hasDuplicateLegs(single_order):
-                self.logger.debug(f"CreateInsights -> Duplicate legs found in order: {single_order}")
-                continue
-
+            
             orderId = position.orderId
             orderTag = position.orderTag
             insights.extend(workingOrder.insights)
@@ -355,11 +357,21 @@ class Base(AlphaModel):
 
             # Map each contract to the openPosition dictionary (key: expiryStr)
             context.workingOrders[orderTag] = workingOrder
+            
+            if self.hasOneDuplicateLeg(single_order):
+                self.logger.debug(f"CreateInsights -> Duplicate leg found in order: {single_order}")
+                continue
 
+            
         self.logger.debug(f"CreateInsights -> insights: {insights}")
         # Stop the timer
         self.context.executionTimer.stop('Alpha.Base -> CreateInsights')
         return insights
+    
+    def hasOneDuplicateLeg(self, order):
+        # Check if checkForDuplicatePositions is enabled
+        if not self.checkForOneDuplicateLeg:
+            return False
 
 
     def buildOrderPosition(self, order, lastClosedOrderTag=None):
@@ -378,145 +390,28 @@ class Base(AlphaModel):
 
         # Get the list of contracts
         contracts = order["contracts"]
-        self.logger.debug(f"buildOrderPosition -> contracts: {len(contracts)}")
-        # Exit if there are no contracts
-        if (len(contracts) == 0):
-            return [None, None]
 
-        useLimitOrders = self.useLimitOrders
-        useMarketOrders = not useLimitOrders
+        openPositions = context.openPositions
 
-        # Current timestamp
-        currentDttm = self.context.Time
+        # Iterate through open positions
+        for orderTag, orderId in list(openPositions.items()):
+            position = context.allPositions[orderId]
 
-        strategyId = order["strategyId"]
-        contractSide = order["contractSide"]
-        # midPrices = order["midPrices"]
-        strikes = order["strikes"]
-        # IVs = order["IV"]
-        expiry = order["expiry"]
-        targetPremium = order["targetPremium"]
-        maxOrderQuantity = order["maxOrderQuantity"]
-        orderQuantity = order["orderQuantity"]
-        bidAskSpread = order["bidAskSpread"]
-        orderMidPrice = order["orderMidPrice"]
-        limitOrderPrice = order["limitOrderPrice"]
-        maxLoss = order["maxLoss"]
-        targetProfit = order.get("targetProfit", None)
+            # Check if the expiry matches
+            if position.expiryStr != order["expiry"].strftime("%Y-%m-%d"):
+                continue
 
-        # Expiry String
-        expiryStr = expiry.strftime("%Y-%m-%d")
+            # Check if the strategy matches (if allowMultipleEntriesPerExpiry is False)
+            if not self.allowMultipleEntriesPerExpiry and position.strategyId == order["strategyId"]:
+                return True
 
-        self.logger.debug(f"buildOrderPosition -> expiry: {expiry}, expiryStr: {expiryStr}")
+            # Compare legs
+            for leg in position.legs:
+                for contract in contracts:
+                    if leg.strike == contract.strike:
+                        return True
 
-        # Validate the order prior to submit
-        if (  # We have a minimum order quantity
-                orderQuantity == 0
-                # The sign of orderMidPrice must be consistent with whether this is a credit strategy (+1) or debit strategy (-1)
-                or np.sign(orderMidPrice) != 2 * int(order["creditStrategy"]) - 1
-                # Exit if the order quantity exceeds the maxOrderQuantity
-                or (self.validateQuantity and orderQuantity > maxOrderQuantity)
-                # Make sure the bid-ask spread is not too wide before opening the position.
-                # Only for Market orders. In case of limit orders, this validation is done at the time of execution of the Limit order
-                or (useMarketOrders and self.validateBidAskSpread
-                    and abs(bidAskSpread) >
-                    self.bidAskSpreadRatio * abs(orderMidPrice))):
-            return [None, None]
-
-        self.logger.debug(f"buildOrderPosition -> orderMidPrice: {orderMidPrice}, orderQuantity: {orderQuantity}, maxOrderQuantity: {maxOrderQuantity}")
-
-        # Get the current price of the underlying
-        underlyingPrice = self.contractUtils.getUnderlyingLastPrice(contracts[0])
-
-        # Get the Order Id and add it to the order dictionary
-        orderId = self.getNextOrderId()
-        # Create unique Tag to keep track of the order when the fill occurs
-        orderTag = f"{strategyId}-{orderId}"
-
-        strategyLegs = []
-        self.logger.debug(f"buildOrderPosition -> strategyLegs: {strategyLegs}")
-        for contract in contracts:
-            key = order["contractSideDesc"][contract.Symbol]
-            leg = Leg(
-                key=key,
-                strike=strikes[key],
-                expiry=order["contractExpiry"][key],
-                contractSide=contractSide[contract.Symbol],
-                symbol=contract.Symbol,
-                contract=contract,
-            )
-
-            strategyLegs.append(leg)
-
-        position = Position(
-            orderId=orderId,
-            orderTag=orderTag,
-            strategy=self,
-            strategyTag=self.nameTag,
-            strategyId=strategyId,
-            legs=strategyLegs,
-            expiry=expiry,
-            expiryStr=expiryStr,
-            targetProfit=targetProfit,
-            linkedOrderTag=lastClosedOrderTag,
-            contractSide=contractSide,
-            openDttm=currentDttm,
-            openDt=currentDttm.strftime("%Y-%m-%d"),
-            openDTE=(expiry.date() - currentDttm.date()).days,
-            limitOrder=useLimitOrders,
-            targetPremium=targetPremium,
-            orderQuantity=orderQuantity,
-            maxOrderQuantity=maxOrderQuantity,
-            openOrderMidPrice=orderMidPrice,
-            openOrderMidPriceMin=orderMidPrice,
-            openOrderMidPriceMax=orderMidPrice,
-            openOrderBidAskSpread=bidAskSpread,
-            openOrderLimitPrice=limitOrderPrice,
-            # underlyingPriceAtOrderOpen=underlyingPrice,
-            underlyingPriceAtOpen=underlyingPrice,
-            openOrder=OrderType(
-                limitOrderExpiryDttm=context.Time + self.limitOrderExpiration,
-                midPrice=orderMidPrice,
-                limitOrderPrice=limitOrderPrice,
-                bidAskSpread=bidAskSpread,
-                maxLoss=maxLoss
-            )
-        )
-
-        self.logger.debug(f"buildOrderPosition -> position: {position}")
-
-        # Create combo orders by using the provided method instead of always calling MarketOrder.
-        insights = []
-
-        # Create the orders
-        for contract in contracts:
-            # Get the contract side (Long/Short)
-            orderSide = contractSide[contract.Symbol]
-            insight = Insight.Price(
-                contract.Symbol,
-                position.openOrder.limitOrderExpiryDttm,
-                InsightDirection.Down if orderSide == -1 else InsightDirection.Up
-            )
-            insights.append(insight)
-
-        self.logger.debug(f"buildOrderPosition -> insights: {insights}")
-
-        # Map each contract to the openPosition dictionary (key: expiryStr)
-        workingOrder = WorkingOrder(
-            positionKey=orderId,
-            insights=insights,
-            limitOrderPrice=limitOrderPrice,
-            orderId=orderId,
-            strategy=self,
-            strategyTag=self.nameTag,
-            useLimitOrder=useLimitOrders,
-            orderType="open",
-            fills=0
-        )
-
-        self.logger.debug(f"buildOrderPosition -> workingOrder: {workingOrder}")
-
-        return [position, workingOrder]
+        return False
 
 
     def hasDuplicateLegs(self, order):

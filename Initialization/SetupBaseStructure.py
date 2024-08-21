@@ -118,6 +118,9 @@ class SetupBaseStructure:
         # Dictionary to keep track of all leg details across time
         self.positionTracking = {}
 
+        # keep the ordering object which is used to build order positions the same across the code, also because we need to access chain/contracts to make orders, which is updated inside this variable. 
+        self.context.ordering = None
+
         # Assign the DEFAULT_PARAMETERS
         self.AddConfiguration(**SetupBaseStructure.DEFAULT_PARAMETERS)
         self.SetBacktestCutOffTime()
