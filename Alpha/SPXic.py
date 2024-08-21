@@ -83,16 +83,18 @@ class SPXic(Base):
             self.logger.debug(f"SPXic -> getOrder -> current_time in trade_times: {current_time in trade_times}")
             if current_time not in trade_times:
                 return None
-            call =  self.order.getSpreadOrder(
-                chain,
+
+            # update the contract/chain data on the order module 
+            self.context.ordering.updateChain(chain)
+            
+            call =  self.context.ordering.getSpreadOrder(
                 'call',
                 fromPrice=self.minPremium,
                 toPrice=self.maxPremium,
                 wingSize=self.callWingSize,
                 sell=True
             )
-            put = self.order.getSpreadOrder(
-                chain,
+            put = self.context.ordering.getSpreadOrder(
                 'put',
                 fromPrice=self.minPremium,
                 toPrice=self.maxPremium,
