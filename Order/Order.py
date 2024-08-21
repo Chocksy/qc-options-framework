@@ -3,12 +3,13 @@ from AlgorithmImports import *
 #endregion
 
 import numpy as np
+from .Base import Base
 from .OrderBuilder import OrderBuilder
 from Tools import ContractUtils, BSM, Logger
 from Strategy import Position
 
 
-class Order:
+class Order(Base):
     """
     Represents an order handling system, capable of managing different
     types of options orders including complex strategies like straddles, 
@@ -20,19 +21,21 @@ class Order:
 
     Attributes:
         context (Any): Context in which the order exists, providing access to current market conditions and account settings.
-        base (Any): Base configuration for the order, containing parameters like maximum order quantity and target premium percentage.
+        strategy (Any): Strategy configuration for the order, containing parameters like maximum order quantity and target premium percentage.
         logger (Logger): Logger for debugging and logging runtime information.
         bsm (BSM): Black-Scholes-Merton pricing model for options valuation.
         contractUtils (ContractUtils): Utility functions for managing contract-related operations.
         strategyBuilder (OrderBuilder): Builder for creating and managing trading strategies and orders.
     """
-    def __init__(self, context, base):
-        self.context = context
-        self.base = base 
-        self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel) # Set the logger
-        self.bsm = BSM(context) # Initialize the BSM pricing model
-        self.contractUtils = ContractUtils(context) # Initialize the contract utils
-        self.strategyBuilder = OrderBuilder(context) # Initialize the Strategy Builder
+
+    def __init__(self, context, strategy):
+        super().__init__(context, strategy)
+        # Initialize the BSM pricing model
+        self.bsm = BSM(context)
+        # Initialize the contract utils
+        self.contractUtils = ContractUtils(context)
+        # Initialize the Strategy Builder
+        self.strategyBuilder = OrderBuilder(context)
 
     def fValue(self, spotPrice, contracts, sides=None, atTime=None, openPremium=None):
         """
@@ -106,6 +109,7 @@ class Order:
         Returns:
             float: Maximum possible loss for the order.
         """
+        # Exit if there are no contracts to process
         if len(contracts) == 0:
             return 0
 
@@ -132,18 +136,19 @@ class Order:
         Returns:
             int: Maximum allowable order quantity based on current strategy settings and account performance.
         """
+        # Get the context
         context = self.context
 
         # Get the maximum order quantity parameter
-        maxOrderQuantity = self.base.maxOrderQuantity
+        maxOrderQuantity = self.strategy.maxOrderQuantity
         # Get the targetPremiumPct
-        targetPremiumPct = self.base.targetPremiumPct
+        targetPremiumPct = self.strategy.targetPremiumPct
         # Check if we are using dynamic premium targeting
         if targetPremiumPct != None:
             # Scale the maxOrderQuantity consistently with the portfolio growth
             maxOrderQuantity = round(maxOrderQuantity * (1 + context.Portfolio.TotalProfit / context.initialAccountValue))
             # Make sure we don't go below the initial parameter value
-            maxOrderQuantity = max(self.base.maxOrderQuantity, maxOrderQuantity)
+            maxOrderQuantity = max(self.strategy.maxOrderQuantity, maxOrderQuantity)
         # Return the result
         return maxOrderQuantity
 
@@ -160,6 +165,7 @@ class Order:
         Returns:
             bool: True if the order is a duplicate, False otherwise.
         """
+        # Loop through all working orders of this strategy
         for orderTag in list(self.context.workingOrders):
             # Get the current working order
             workingOrder = self.context.workingOrders.get(orderTag)
@@ -203,12 +209,13 @@ class Order:
         Returns:
             float: The computed limit order price.
         """
-        limitOrderAbsolutePrice = self.base.limitOrderAbsolutePrice
+        # Get the limitOrderAbsolutePrice
+        limitOrderAbsolutePrice = self.strategy.limitOrderAbsolutePrice
         # Get the minPremium and maxPremium to determine the limit price based on that.
-        minPremium = self.base.minPremium
-        maxPremium = self.base.maxPremium
+        minPremium = self.strategy.minPremium
+        maxPremium = self.strategy.maxPremium
         # Get the limitOrderRelativePriceAdjustment
-        limitOrderRelativePriceAdjustment = self.base.limitOrderRelativePriceAdjustment or 0.0
+        limitOrderRelativePriceAdjustment = self.strategy.limitOrderRelativePriceAdjustment or 0.0
 
         # Compute Limit Order price
         if limitOrderAbsolutePrice is not None:
@@ -224,7 +231,7 @@ class Order:
             limitOrderPrice = orderMidPrice * (1 + limitOrderRelativePriceAdjustment)
 
         # Compute the total slippage
-        totalSlippage = sum(list(map(abs, sides))) * self.base.slippage
+        totalSlippage = sum(list(map(abs, sides))) * self.strategy.slippage
         # Add slippage to the limit order
         limitOrderPrice -= totalSlippage
 
@@ -272,8 +279,8 @@ class Order:
         expiryLastTradingDay = self.context.lastTradingDay(expiry)
         # Set the date/time threshold by which the position must be closed (on the last trading day before expiration)
         expiryMarketCloseCutoffDttm = None
-        if self.base.marketCloseCutoffTime != None:
-            expiryMarketCloseCutoffDttm = datetime.combine(expiryLastTradingDay, self.base.marketCloseCutoffTime)
+        if self.strategy.marketCloseCutoffTime != None:
+            expiryMarketCloseCutoffDttm = datetime.combine(expiryLastTradingDay, self.strategy.marketCloseCutoffTime)
         # Dictionary to map each contract symbol to the side (short/long)
         contractSide = {}
         # Dictionary to map each contract symbol to its description
@@ -295,19 +302,19 @@ class Order:
         contractExpiry = {}
 
         # Compute the Greeks for each contract (if not already available)
-        if self.base.computeGreeks:
+        if self.strategy.computeGreeks:
             self.bsm.setGreeks(contracts)
 
         # Compute the Mid-Price and Bid-Ask spread for the full order
         orderMidPrice = 0.0
         bidAskSpread = 0.0
         # Get the slippage parameter (if available)
-        slippage = self.base.slippage or 0.0
+        slippage = self.strategy.slippage or 0.0
 
         # Get the maximum order quantity
         maxOrderQuantity = self.getMaxOrderQuantity()
         # Get the targetPremiumPct
-        targetPremiumPct = self.base.targetPremiumPct
+        targetPremiumPct = self.strategy.targetPremiumPct
         # Check if we are using dynamic premium targeting
         if targetPremiumPct != None:
             # Make sure targetPremiumPct is bounded to the range [0, 1])
@@ -315,7 +322,7 @@ class Order:
             # Compute the target premium as a percentage of the total net portfolio value
             targetPremium = context.Portfolio.TotalPortfolioValue * targetPremiumPct
         else:
-            targetPremium = self.base.targetPremium
+            targetPremium = self.strategy.targetPremium
 
         # Check if we have a description for the contracts
         if sidesDesc == None:
@@ -372,7 +379,7 @@ class Order:
         limitOrderPrice = round(limitOrderPrice, 2)
 
         # Determine which price is used to compute the order quantity
-        if self.base.useLimitOrders:
+        if self.strategy.useLimitOrders:
             # Use the Limit Order price
             qtyMidPrice = limitOrderPrice
         else:
@@ -401,18 +408,18 @@ class Order:
                 orderQuantity = math.floor(orderQuantity)
 
         # Get the current price of the underlying
-        security = context.Securities[self.base.underlyingSymbol]
+        security = context.Securities[self.strategy.underlyingSymbol]
         underlyingPrice = context.GetLastKnownPrice(security).Price
 
         # Compute MaxLoss
         maxLoss = self.computeOrderMaxLoss(contracts, sides)
         # Get the Profit Target percentage is specified (default is 50%)
-        profitTargetPct = self.base.parameter("profitTarget", 0.5)
+        profitTargetPct = self.strategy.parameter("profitTarget", 0.5)
         # Compute T-Reg margin based on the MaxLoss
         TReg = min(0, orderMidPrice + maxLoss) * orderQuantity
 
         portfolioMarginStress = self.context.portfolioMarginStress
-        if self.base.computeGreeks:
+        if self.strategy.computeGreeks:
             # Compute the projected P&L of the position following a % movement of the underlying up or down
             portfolioMargin = min(
                 0,
@@ -494,8 +501,8 @@ class Order:
         #         }
 
         # Determine the method used to calculate the profit target
-        profitTargetMethod = self.base.parameter("profitTargetMethod", "Premium").lower()
-        thetaProfitDays = self.base.parameter("thetaProfitDays", 0)
+        profitTargetMethod = self.strategy.parameter("profitTargetMethod", "Premium").lower()
+        thetaProfitDays = self.strategy.parameter("thetaProfitDays", 0)
         # Set a custom profit target unless we are using the default Premium based methodology
         if profitTargetMethod != "premium":
             if profitTargetMethod == "theta" and thetaProfitDays > 0:
@@ -942,3 +949,6 @@ class Order:
         order = self.getOrderDetails(legs, sides, strategy, sell = sell, sidesDesc = sidesDesc)
         # Return the order
         return order
+
+
+

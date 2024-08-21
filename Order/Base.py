@@ -13,7 +13,6 @@ class Base:
         self.context = context
         # Set the logger
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
-        self.order = Order(context, strategy)
         self.strategy = strategy
         # Set default name (use the class name)
         self.name = strategy.name
@@ -21,16 +20,9 @@ class Base:
         self.nameTag = strategy.nameTag
         # Initialize the contract utils
         self.contractUtils = ContractUtils(context)
-        self.chain = None
 
     def updateChain(self, chain):
-        self.chain = chain
-        
-    def getSpreadOrder(self, type, strike = None, delta = None, wingSize = None, sell = True, fromPrice = None, toPrice = None, premiumOrder = "max"):
-        return self.order.getSpreadOrder(self.chain, type, strike, delta, wingSize, sell, fromPrice, toPrice, premiumOrder)
-
-    def getNakedOrder(self, type, strike = None, delta = None, fromPrice = None, toPrice = None, sell = True):
-        return self.order.getNakedOrder(self.chain, type, strike, delta, fromPrice, toPrice, sell)
+        self.context.chain = chain
 
     def buildOrderPosition(self, order, lastClosedOrderTag=None):
         # Get the context
@@ -62,7 +54,6 @@ class Base:
         orderMidPrice = order["orderMidPrice"]
         limitOrderPrice = order["limitOrderPrice"]
         maxLoss = order["maxLoss"]
-        min_net_credit = order["min_net_credit"]
         targetProfit = order.get("targetProfit", None)
 
         # Expiry String
@@ -133,7 +124,6 @@ class Base:
             openOrderMidPriceMax=orderMidPrice,
             openOrderBidAskSpread=bidAskSpread,
             openOrderLimitPrice=limitOrderPrice,
-            min_net_credit = min_net_credit,
             # underlyingPriceAtOrderOpen=underlyingPrice,
             underlyingPriceAtOpen=underlyingPrice,
             openOrder=OrderType(
@@ -173,7 +163,6 @@ class Base:
             strategy=self,
             strategyTag=self.nameTag,
             useLimitOrder=useLimitOrders,
-            min_net_credit = min_net_credit,
             orderType="open",
             fills=0
         )
