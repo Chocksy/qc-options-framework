@@ -4,7 +4,6 @@ from AlgorithmImports import *
 
 from Tools import Logger, ContractUtils, BSM
 
-
 class OrderBuilder:
     """
     Manages the creation and retrieval of option contracts based on specified criteria to facilitate order construction.
@@ -185,14 +184,14 @@ class OrderBuilder:
 
     def getDeltaStrike(self, contracts, delta = None):
         """
-        Retrieves the strike price of the contract closest to a specified delta value.
+        Retrieves the strike price of the contract with the closest delta value.
 
         Args:
-            contracts (list[OptionContract]): Sorted list of option contracts.
+            contracts (list[OptionContract]): List of option contracts.
             delta (float, optional): The target delta value.
 
         Returns:
-            float: The strike price of the contract closest to the specified delta, or None if not found.
+            float: The strike price of the contract with the closest delta, or None if not found.
         """
         deltaStrike = None
         # Get the contract with the closest Delta
@@ -207,15 +206,14 @@ class OrderBuilder:
 
     def getFromDeltaStrike(self, contracts, delta = None, default = None):
         """
-        Retrieve the minimum strike price of the contract with a delta value within the specified range.
+        Retrieves the strike price of the contract with the closest delta value.
 
         Args:
-            contracts: A sorted list of option contracts of the same type (Call or Put).
-            delta: The target delta value to match.
-            default: The default strike price to return if no contract is found.
+            contracts (list[OptionContract]): List of option contracts.
+            delta (float, optional): The target delta value.
 
         Returns:
-            float: The minimum strike price of the contract within the delta range, or the default value.
+            float: The strike price of the contract with the closest delta, or None if not found.
         """
         fromDeltaStrike = default
         # Get the call with the closest Delta
@@ -234,15 +232,14 @@ class OrderBuilder:
 
     def getToDeltaStrike(self, contracts, delta = None, default = None):
         """
-        Retrieve the maximum strike price of the contract with a delta value within the specified range.
+        Retrieves the strike price of the contract with the closest delta value.
 
         Args:
-            contracts: A sorted list of option contracts of the same type (Call or Put).
-            delta: The target delta value to match.
-            default: The default strike price to return if no contract is found.
+            contracts (list[OptionContract]): List of option contracts.
+            delta (float, optional): The target delta value.
 
         Returns:
-            float: The maximum strike price of the contract within the delta range, or the default value.
+            float: The strike price of the contract with the closest delta, or None if not found.
         """
         toDeltaStrike = default
         # Get the put with the closest Delta
@@ -261,73 +258,73 @@ class OrderBuilder:
 
     def getPutFromDeltaStrike(self, contracts, delta = None):
         """
-        Retrieve the minimum strike price of the Put contract with a delta value within the specified range.
+        Retrieves the strike price of the contract with the closest delta value.
 
         Args:
-            contracts: A sorted list of option contracts.
-            delta: The target delta value to match.
+            contracts (list[OptionContract]): List of option contracts.
+            delta (float, optional): The target delta value.
 
         Returns:
-            float: The minimum strike price of the Put contract within the delta range.
+            float: The strike price of the contract with the closest delta, or None if not found.
         """
         return self.getFromDeltaStrike(contracts, delta = delta, default = 0.0)
 
     def getCallFromDeltaStrike(self, contracts, delta = None):
         """
-        Retrieve the minimum strike price of the Call contract with a delta value within the specified range.
+        Retrieves the strike price of the contract with the closest delta value.
 
         Args:
-            contracts: A sorted list of option contracts.
-            delta: The target delta value to match.
+            contracts (list[OptionContract]): List of option contracts.
+            delta (float, optional): The target delta value.
 
         Returns:
-            float: The minimum strike price of the Call contract within the delta range.
+            float: The strike price of the contract with the closest delta, or None if not found.
         """
         return self.getFromDeltaStrike(contracts, delta = delta, default = float('Inf'))
 
     def getPutToDeltaStrike(self, contracts, delta = None):
         """
-        Retrieve the maximum strike price of the Put contract with a delta value within the specified range.
+        Retrieves the strike price of the contract with the closest delta value.
 
         Args:
-            contracts: A sorted list of option contracts.
-            delta: The target delta value to match.
+            contracts (list[OptionContract]): List of option contracts.
+            delta (float, optional): The target delta value.
 
         Returns:
-            float: The maximum strike price of the Put contract within the delta range.
+            float: The strike price of the contract with the closest delta, or None if not found.
         """
         return self.getToDeltaStrike(contracts, delta = delta, default = float('Inf'))
 
     def getCallToDeltaStrike(self, contracts, delta = None):
         """
-        Retrieve the maximum strike price of the Call contract with a delta value within the specified range.
+        Retrieves the strike price of the contract with the closest delta value.
 
         Args:
-            contracts: A sorted list of option contracts.
-            delta: The target delta value to match.
+            contracts (list[OptionContract]): List of option contracts.
+            delta (float, optional): The target delta value.
 
         Returns:
-            float: The maximum strike price of the Call contract within the delta range.
+            float: The strike price of the contract with the closest delta, or None if not found.
         """
         return self.getToDeltaStrike(contracts, delta = delta, default = 0)
 
     def getContracts(self, contracts, type = None, fromDelta = None, toDelta = None, fromStrike = None, toStrike = None, fromPrice = None, toPrice = None, reverse = False):
         """
-        Retrieves and filters contracts based on specified criteria including type, delta, strike range, and price range.
+        Filters and sorts option contracts based on specified criteria.
 
         Args:
             contracts (list[OptionContract]): List of option contracts.
-            type (str, optional): Option type to filter ('Put', 'Call', or None for both).
-            fromDelta (float, optional): Minimum delta value.
-            toDelta (float, optional): Maximum delta value.
-            fromStrike (float, optional): Minimum strike price.
-            toStrike (float, optional): Maximum strike price.
-            fromPrice (float, optional): Minimum option price.
-            toPrice (float, optional): Maximum option price.
-            reverse (bool, optional): If True, sort results in descending order by strike.
+            type (str, optional): The type of option to filter ('call', 'put', or 'both').
+            fromDelta (float, optional): The minimum delta value.
+            toDelta (float, optional): The maximum delta value.
+            fromStrike (float, optional): The minimum strike price.
+            toStrike (float, optional): The maximum strike price.
+            fromPrice (float, optional): The minimum option price.
+            toPrice (float, optional): The maximum option price.
+            reverse (bool, optional): If True, sort the contracts in descending order.
 
         Returns:
-            list[OptionContract]: List of filtered and sorted option contracts.
+            list[OptionContract]: Filtered and sorted list of option contracts.
         """
         # Make sure all constraints are set
         fromStrike = fromStrike or 0
@@ -401,19 +398,19 @@ class OrderBuilder:
 
     def getPuts(self, contracts, fromDelta = None, toDelta = None, fromStrike = None, toStrike = None, fromPrice = None, toPrice = None):
         """
-        Retrieves and filters Put contracts based on specified criteria.
+        Retrieves Put option contracts based on specified criteria.
 
         Args:
             contracts (list[OptionContract]): List of option contracts.
-            fromDelta (float, optional): Minimum delta value for Put contracts.
-            toDelta (float, optional): Maximum delta value for Put contracts.
-            fromStrike (float, optional): Minimum strike price for Put contracts.
-            toStrike (float, optional): Maximum strike price for Put contracts.
-            fromPrice (float, optional): Minimum price for Put contracts.
-            toPrice (float, optional): Maximum price for Put contracts.
+            fromDelta (float, optional): The minimum delta value.
+            toDelta (float, optional): The maximum delta value.
+            fromStrike (float, optional): The minimum strike price.
+            toStrike (float, optional): The maximum strike price.
+            fromPrice (float, optional): The minimum option price.
+            toPrice (float, optional): The maximum option price.
 
         Returns:
-            list[OptionContract]: List of filtered Put contracts, sorted by strike price in descending order.
+            list[OptionContract]: Filtered and sorted list of Put option contracts.
         """
         # Sort the Put contracts by their strike in reverse order. Filter them by the specified criteria (Delta/Strike/Price constrains)
         return self.getContracts(contracts
@@ -429,19 +426,19 @@ class OrderBuilder:
 
     def getCalls(self, contracts, fromDelta = None, toDelta = None, fromStrike = None, toStrike = None, fromPrice = None, toPrice = None):
         """
-        Retrieves and filters Call contracts based on specified criteria.
+        Retrieves Call option contracts based on specified criteria.
 
         Args:
             contracts (list[OptionContract]): List of option contracts.
-            fromDelta (float, optional): Minimum delta value for Call contracts.
-            toDelta (float, optional): Maximum delta value for Call contracts.
-            fromStrike (float, optional): Minimum strike price for Call contracts.
-            toStrike (float, optional): Maximum strike price for Call contracts.
-            fromPrice (float, optional): Minimum price for Call contracts.
-            toPrice (float, optional): Maximum price for Call contracts.
+            fromDelta (float, optional): The minimum delta value.
+            toDelta (float, optional): The maximum delta value.
+            fromStrike (float, optional): The minimum strike price.
+            toStrike (float, optional): The maximum strike price.
+            fromPrice (float, optional): The minimum option price.
+            toPrice (float, optional): The maximum option price.
 
         Returns:
-            list[OptionContract]: List of filtered Call contracts, sorted by strike price in ascending order.
+            list[OptionContract]: Filtered and sorted list of Call option contracts.
         """
         # Sort the Call contracts by their strike in ascending order. Filter them by the specified criteria (Delta/Strike/Price constrains)
         return self.getContracts(contracts
@@ -455,20 +452,16 @@ class OrderBuilder:
                                 , reverse = False
                                 )
 
-    # Get the wing contract at the requested distance
-    # Assumptions:
-    #  - The input contracts are sorted by increasing distance from the ATM (ascending order for Calls, descending order for Puts)
-    #  - The first contract in the list is assumed to be one of the legs of the spread, and it is used to determine the distance for the wing
     def getWing(self, contracts, wingSize = None):
         """
-        Retrieve the wing contract at the specified distance from the first contract.
+        Retrieves the wing contract at the requested distance.
 
         Args:
-            contracts: A list of option contracts sorted by distance from the ATM (ascending for Calls, descending for Puts).
-            wingSize: The distance from the first contract's strike to the wing contract.
+            contracts (list[OptionContract]): List of option contracts.
+            wingSize (float, optional): The distance from the ATM strike.
 
         Returns:
-            OptionContract: The wing contract closest to the specified distance from the first contract's strike, or None if no suitable contract is found.
+            OptionContract: The wing contract, or None if not found.
         """
         # Make sure the wingSize is specified
         wingSize = wingSize or 0
@@ -497,24 +490,23 @@ class OrderBuilder:
 
         return wingContract
 
-    # Get Spread contracts (Put or Call)
     def getSpread(self, contracts, type, strike = None, delta = None, wingSize = None, sortByStrike = False, fromPrice = None, toPrice = None, premiumOrder = 'max'):
         """
-        Retrieve a spread of option contracts based on specified criteria.
+        Retrieves the best spread contract based on specified criteria.
 
         Args:
-            contracts: A list of option contracts to use for creating the spread.
-            type: The type of spread to retrieve ("Put" or "Call").
-            strike: (Optional) Specific strike price to filter contracts.
-            delta: (Optional) Delta value to filter contracts.
-            wingSize: (Optional) Distance from the first leg to the wing contract.
-            sortByStrike: (Optional) If True, sort the spread legs by their strike price; otherwise, keep default sorting.
-            fromPrice: (Optional) Minimum price for the spread.
-            toPrice: (Optional) Maximum price for the spread.
-            premiumOrder: (Optional) Order of premium selection ('max' for maximum premium, 'min' for minimum premium).
+            contracts (list[OptionContract]): List of option contracts.
+            type (str): The type of option to filter ('call', 'put', or 'both').
+            strike (float, optional): The target strike price.
+            delta (float, optional): The target delta value.
+            wingSize (float, optional): The distance from the ATM strike.
+            sortByStrike (bool, optional): If True, sort the contracts by strike.
+            fromPrice (float, optional): The minimum option price.
+            toPrice (float, optional): The maximum option price.
+            premiumOrder (str, optional): The order of the premium ('max' or 'min').
 
         Returns:
-            List: A list of option contracts representing the spread, sorted based on specified criteria.
+            list[OptionContract]: The best spread contract, or None if not found.
         """
         # Type is a required parameter
         if type == None:
@@ -572,7 +564,6 @@ class OrderBuilder:
 
         return best_spread
 
-    # Get Put Spread contracts
     def getPutSpread(self, contracts, strike = None, delta = None, wingSize = None, sortByStrike = False):
         """
         Retrieve a Put spread of option contracts based on specified criteria.
@@ -589,7 +580,6 @@ class OrderBuilder:
         """
         return self.getSpread(contracts, "Put", strike = strike, delta = delta, wingSize = wingSize, sortByStrike = sortByStrike)
 
-    # Get Put Spread contracts
     def getCallSpread(self, contracts, strike = None, delta = None, wingSize = None, sortByStrike = True):
         """
         Retrieve a Call spread of option contracts based on specified criteria.
@@ -605,3 +595,4 @@ class OrderBuilder:
             List: A list of option contracts representing the Call spread, sorted based on specified criteria.
         """
         return self.getSpread(contracts, "Call", strike = strike, delta = delta, wingSize = wingSize, sortByStrike = sortByStrike)
+

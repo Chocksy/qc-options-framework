@@ -6,9 +6,7 @@ from Initialization import SetupBaseStructure
 from Alpha.Utils import Scanner, Stats
 from Tools import ContractUtils, Logger, Underlying
 from Strategy import Leg, Position, OrderType, WorkingOrder
-
-#NOTE: We can't use multiple inheritance in Python because this is a managed class. We will use composition instead so in
-# order to call the methods of SetupBaseStructure we'll call then using self.setup.methodName().
+from Order import Order
 
 
 class Base(AlphaModel):
@@ -59,8 +57,7 @@ class Base(AlphaModel):
         OnSecuritiesChanged(algorithm: QCAlgorithm, changes: SecurityChanges) -> None:
             Handles changes in securities, including additions and removals.
     """
-    # Internal counter for all the orders
-    orderCount = 0
+    
 
     DEFAULT_PARAMETERS = {
         # The start time at which the algorithm will start scheduling the strategy execution
@@ -200,10 +197,10 @@ class Base(AlphaModel):
         self.name = type(self).__name__  # Set default name (use the class name)
         self.nameTag = self.name # Set the Strategy Name (optional)
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel) # Set the logger
-        self.order = Order(context, self)
         self.context.structure.AddConfiguration(parent=self, **self.getMergedParameters()) # This adds all the parameters to the class. We can also access them via self.parameter("parameterName")
         self.contractUtils = ContractUtils(context) # Initialize the contract utils
         self.stats = Stats() # Initialize the stats dictionary
+        self.order = Order(context, self)
         self.logger.debug(f'{self.name} -> __init__')
 
     @staticmethod
@@ -315,6 +312,8 @@ class Base(AlphaModel):
             List[Insight]: Generated insights for trading based on the option chain.
         """
         insights = []
+        # update the contract/chain data on the order module 
+        self.order.updateChain(chain)
         # Call the getOrder method of the class implementing OptionStrategy
         order = self.getOrder(chain, data)
 
@@ -336,7 +335,7 @@ class Base(AlphaModel):
             self.logger.debug(f"CreateInsights -> strategyId: {o['strategyId']}, strikes: {o['strikes']}")
 
         for single_order in order: 
-            position, workingOrder = self.context.ordering.buildOrderPosition(single_order, lastClosedOrderTag)
+            position, workingOrder = self.order.buildOrderPosition(single_order, lastClosedOrderTag)
             
 
             self.logger.debug(f"CreateInsights -> position: {position}")
@@ -511,5 +510,7 @@ class Base(AlphaModel):
         Handle changes in securities, including additions and removals.
         """
         pass
+
+
 
 
