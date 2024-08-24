@@ -44,15 +44,15 @@ class HandleOrderEvents:
         if not (orderEvent.Status == OrderStatus.Filled or orderEvent.Status == OrderStatus.PartiallyFilled):
             return
 
-        if orderEvent.IsAssignment:
-            self.handleAssignment()
-            return
-
         position_info = self.getPositionFromOrderEvent()
         if position_info is None:
             return
 
-        bookPosition, workingOrder, orderType = position_info
+        bookPosition, workingOrder, orderType, order = position_info
+
+        if orderEvent.IsAssignment:
+            self.handleAssignment(bookPosition)
+            return
 
         self.logger.debug(f" -> Processing order id {bookPosition.orderId} (orderTag: {bookPosition.orderTag}  -  orderType: {orderType}  -  Expiry: {bookPosition.expiryStr})")
 
@@ -65,8 +65,8 @@ class HandleOrderEvents:
 
         execOrder = bookPosition[f"{orderType}Order"]
 
-        if re.search(" - Warning.*", orderEvent.Tag):
-            self.logger.warning(orderEvent.Tag)
+        if order and hasattr(order, 'Tag') and re.search(" - Warning.*", order.Tag):
+            self.logger.warning(order.Tag)
             execOrder.stalePrice = True
             bookPosition[f"{orderType}StalePrice"] = True
 
@@ -99,24 +99,17 @@ class HandleOrderEvents:
         orderTag = re.sub(" - Warning.*", "", order.Tag)
 
         workingOrder = self.context.workingOrders.get(orderTag)
-        if workingOrder is None:
-            return None
-
         openPosition = self.context.openPositions.get(orderTag)
-        if openPosition is None:
+
+        if workingOrder is None or openPosition is None:
             return None
 
         bookPosition = self.context.allPositions[openPosition]
         orderType = workingOrder.orderType
 
-        return bookPosition, workingOrder, orderType
+        return bookPosition, workingOrder, orderType, order
 
-    def handleAssignment(self):
-        position_info = self.getPositionFromOrderEvent()
-        if position_info is None:
-            return
-
-        bookPosition, _, _ = position_info
+    def handleAssignment(self, bookPosition):
         strategy_module = bookPosition.strategyModule()
         if hasattr(strategy_module, 'handleAssignment'):
             strategy_module.handleAssignment(self.context, bookPosition)
@@ -140,8 +133,8 @@ class HandleOrderEvents:
             PnL = round(bookPosition.PnL, 2)
             percentage = round(bookPosition.PnL / bookPosition.openPremium * 100, 2)
             message += f"; P&L: ${PnL} ({percentage}%)"
-        
-        self.logger.info(message)            
+
+        self.logger.info(message)
         self.logger.info(f"Working order progress of prices: {execOrder.priceProgressList}")
         self.logger.info(f"Position progress of prices: {bookPosition.priceProgressList}")
         self.logger.debug(f"The {orderType} event happened:")
