@@ -64,10 +64,11 @@ class ContractUtils:
             Calculates and returns the bid-ask spread of the given option
     """
 
-    def __init__(self, context):
+    def __init__(self, context, custom_greeks=False):
         self.context = context # Set the context
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel) # Set the logger
-        
+        self.custom_greeks = custom_greeks
+
     def getUnderlyingPrice(self, symbol):
         """
         Returns the latest price of the security associated with the given symbol.
@@ -195,6 +196,8 @@ class ContractUtils:
         Returns:
             float: The delta of the contract.
         """
+        if self.custom_greeks:
+            return contract.BSMGreeks.Delta if hasattr(contract, 'BSMGreeks') else contract.greeks.delta
         return contract.greeks.delta 
 
     def gamma(self, contract):
@@ -205,6 +208,8 @@ class ContractUtils:
         Returns:
             float: The gamma of the contract.
         """
+        if self.custom_greeks:
+            return contract.BSMGreeks.Gamma if hasattr(contract, 'BSMGreeks') else contract.greeks.gamma
         return contract.greeks.gamma 
 
     def theta(self, contract):
@@ -215,6 +220,8 @@ class ContractUtils:
         Returns:
             float: The theta of the contract.
         """
+        if self.custom_greeks:
+            return contract.BSMGreeks.Theta if hasattr(contract, 'BSMGreeks') else contract.greeks.theta
         return contract.greeks.theta 
 
     def vega(self, contract):
@@ -225,6 +232,8 @@ class ContractUtils:
         Returns:
             float: The vega of the contract.
         """
+        if self.custom_greeks:
+            return contract.BSMGreeks.Vega if hasattr(contract, 'BSMGreeks') else contract.greeks.vega
         return contract.greeks.vega 
 
     def rho(self, contract):
@@ -235,6 +244,8 @@ class ContractUtils:
         Returns:
             float: The rho of the contract.
         """
+        if self.custom_greeks:
+            return contract.BSMGreeks.Rho if hasattr(contract, 'BSMGreeks') else contract.greeks.rho
         return contract.greeks.rho 
         
     def bidPrice(self, contract):
