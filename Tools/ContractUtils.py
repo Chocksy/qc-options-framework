@@ -6,18 +6,87 @@ from .Logger import Logger
 
 
 class ContractUtils:
-    def __init__(self, context):
-        # Set the context
-        self.context = context
-        # Set the logger
-        self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel)
+    """
+    Utility class for handling contract-related operations and retrieving contract details.
+    This class provides methods to extract and compute various properties and metrics related to financial
+    contracts. It interacts with the provided context to fetch current market data and perform operations
+    related to securities and contracts.
+    Attributes:
+        context: An object providing access to market data and securities.
+        logger: An instance of Logger used for logging operations.
+    Methods:
+        getUnderlyingPrice(symbol):
+            Returns the latest price of the security associated with the given symbol.
         
+        getUnderlyingLastPrice(contract):
+            Retrieves the last known price of the underlying security of the given contract.
+        
+        getSecurity(contract):
+            Returns the security object associated with the given contract.
+        
+        midPrice(contract):
+            Calculates and returns the mid-price of the given option contract.
+        
+        strikePrice(contract):
+            Returns the strike price of the given option contract.
+        
+        expiryDate(contract):
+            Returns the expiry date of the given option contract.
+        
+        volume(contract):
+            Returns the trading volume of the given option contract.
+        
+        openInterest(contract):
+            Returns the open interest of the given option contract.
+        
+        delta(contract):
+            Returns the delta of the given option contract if available.
+        
+        gamma(contract):
+            Returns the gamma of the given option contract if available.
+        
+        theta(contract):
+            Returns the theta of the given option contract if available.
+        
+        vega(contract):
+            Returns the vega of the given option contract if available.
+        
+        rho(contract):
+            Returns the rho of the given option contract if available.
+        
+        bidPrice(contract):
+            Returns the bid price of the given option contract.
+        
+        askPrice(contract):
+            Returns the ask price of the given option contract.
+        
+        bidAskSpread(contract):
+            Calculates and returns the bid-ask spread of the given option
+    """
 
+    def __init__(self, context):
+        self.context = context # Set the context
+        self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel) # Set the logger
+        
     def getUnderlyingPrice(self, symbol):
+        """
+        Returns the latest price of the security associated with the given symbol.
+        Args:
+            symbol (str): The symbol of the security.
+        Returns:
+            float: The last known price of the security.
+        """
         security = self.context.Securities[symbol]
         return self.context.GetLastKnownPrice(security).Price
 
     def getUnderlyingLastPrice(self, contract):
+        """
+        Retrieves the last known price of the underlying security of the given contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The last known price of the underlying security.
+        """
         # Get the context
         context = self.context
         # Get the object from the Securities dictionary if available (pull the latest price), else use the contract object itself
@@ -33,6 +102,13 @@ class ContractUtils:
             return contract.UnderlyingLastPrice
 
     def getSecurity(self, contract):
+        """
+        Retrieves the security object associated with the given contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            Security: The security object associated with the contract.
+        """
         # Get the Securities object
         Securities = self.context.Securities
         # Check if we can extract the Symbol attribute
@@ -46,58 +122,150 @@ class ContractUtils:
 
     # Returns the mid-price of an option contract
     def midPrice(self, contract):
+        """
+        Calculates and returns the mid-price of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The mid-price of the contract.
+        """
         security = self.getSecurity(contract)
         return 0.5 * (security.BidPrice + security.AskPrice)
     
     # Returns the mid-price of an option contract
     def strikePrice(self, contract):
+        """
+        Retrieves the strike price of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The strike price of the contract.
+        """
         security = self.getSecurity(contract)
         return security.symbol.ID.StrikePrice
     
     def expiryDate(self, contract):
+        """
+        Retrieves the expiry date of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            datetime: The expiry date of the contract.
+        """
         security = self.getSecurity(contract)
         return security.symbol.ID.Date
     
     def volume(self, contract):
+        """
+        Retrieves the trading volume of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            int: The trading volume of the contract.
+        """
         security = self.getSecurity(contract)
         return security.Volume
     
     def openInterest(self, contract):
+        """
+        Retrieves the open interest of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            int: The open interest of the contract.
+        """
         security = self.getSecurity(contract)
         return security.OpenInterest
 
     def implied_volatility(self, contract):
-        security = self.getSecurity(contract)
+        """
+        Retrieves the implied volatility of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The implied volatility of the contract.
+        """
         return contract.implied_volatility
 
     def delta(self, contract):
-        security = self.getSecurity(contract)
+        """
+        Retrieves the delta of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The delta of the contract.
+        """
         return contract.greeks.delta 
 
     def gamma(self, contract):
-        security = self.getSecurity(contract)
+        """
+        Retrieves the gamma of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The gamma of the contract.
+        """
         return contract.greeks.gamma 
 
     def theta(self, contract):
-        security = self.getSecurity(contract)
+        """
+        Retrieves the theta of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The theta of the contract.
+        """
         return contract.greeks.theta 
 
     def vega(self, contract):
-        security = self.getSecurity(contract)
+        """
+        Retrieves the vega of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The vega of the contract.
+        """
         return contract.greeks.vega 
 
     def rho(self, contract):
-        security = self.getSecurity(contract)
+        """
+        Retrieves the rho of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The rho of the contract.
+        """
         return contract.greeks.rho 
         
     def bidPrice(self, contract):
+        """
+        Retrieves the bid price of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The bid price of the contract.
+        """
         security = self.getSecurity(contract)
         return security.BidPrice
 
     def askPrice(self, contract):
+        """
+        Retrieves the ask price of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The ask price of the contract.
+        """
         security = self.getSecurity(contract)
         return security.AskPrice
 
     def bidAskSpread(self, contract):
+        """
+        Calculates and returns the bid-ask spread of the given option contract.
+        Args:
+            contract (Contract): The contract object.
+        Returns:
+            float: The bid-ask spread of the contract.
+        """
         security = self.getSecurity(contract)
         return abs(security.AskPrice - security.BidPrice)
