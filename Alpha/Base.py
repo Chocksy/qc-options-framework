@@ -504,10 +504,10 @@ class Base(AlphaModel):
     def dataConsolidated(self, sender, consolidated):
         pass
 
-    def handleAssignment(self, order):
-        """
-        Handle the assignment of an order.
-        """
+    @classmethod
+    def handleAssignment(cls, context, assignedPosition):
+        # Default implementation
+        context.logger.info(f"Base handleAssignment called for {assignedPosition}")
         pass
 
     def OnSecuritiesChanged(self, algorithm: QCAlgorithm, changes: SecurityChanges) -> None:

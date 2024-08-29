@@ -51,6 +51,7 @@ class HandleOrderEvents:
         bookPosition, workingOrder, orderType, order = position_info
 
         if orderEvent.IsAssignment:
+            self.logger.info(f" -> Processing assignment for position: {bookPosition.orderTag}")
             self.handleAssignment(bookPosition)
             return
 
@@ -70,7 +71,8 @@ class HandleOrderEvents:
             execOrder.stalePrice = True
             bookPosition[f"{orderType}StalePrice"] = True
 
-        workingOrder.fills += abs(orderEvent.FillQuantity)
+        if workingOrder:
+            workingOrder.fills += abs(orderEvent.FillQuantity)
 
         execOrder.fills += abs(orderEvent.FillQuantity)
         execOrder.fillPrice -= np.sign(orderEvent.FillQuantity) * orderEvent.FillPrice
@@ -101,27 +103,35 @@ class HandleOrderEvents:
         workingOrder = self.context.workingOrders.get(orderTag)
         openPosition = self.context.openPositions.get(orderTag)
 
-        if workingOrder is None or openPosition is None:
-            return None
+        if openPosition is not None:
+            bookPosition = self.context.allPositions[openPosition]
+            orderType = workingOrder.orderType if workingOrder else "close"
+            return bookPosition, workingOrder, orderType, order
 
-        bookPosition = self.context.allPositions[openPosition]
-        orderType = workingOrder.orderType
+        # If openPosition is None, search by symbol in allPositions
+        orderEventSymbol = self.orderEvent.Symbol
 
-        return bookPosition, workingOrder, orderType, order
+        for position in self.context.allPositions.values():
+            if any(leg.symbol == orderEventSymbol for leg in position.legs):
+                orderType = "close"  # Assuming assignment is a closing event
+                return position, None, orderType, order
+
+        return None
 
     def handleAssignment(self, bookPosition):
-        strategy_module = bookPosition.strategyModule()
-        if hasattr(strategy_module, 'handleAssignment'):
-            strategy_module.handleAssignment(self.context, bookPosition)
+        strategy_class = bookPosition.strategyModule()
+        if hasattr(strategy_class, 'handleAssignment'):
+            strategy_class.handleAssignment(self.context, bookPosition)
         else:
-            self.logger.warning(f"Strategy {bookPosition.strategy} does not have a handleAssignment method")
+            self.logger.info(f"Strategy {bookPosition.strategy} does not have a handleAssignment method")
 
         self.logger.info(f"Handled assignment for position: {bookPosition.orderTag}")
 
     def handleFullyFilledOrder(self, bookPosition, execOrder, orderType, workingOrder):
         execOrder.filled = True
         bookPosition.updateOrderStats(self.context, orderType)
-        self.context.workingOrders.pop(bookPosition.orderTag)
+        if workingOrder:
+            self.context.workingOrders.pop(bookPosition.orderTag, None)
         bookPosition[orderType + "FilledDttm"] = self.context.Time
         bookPosition[orderType + "OrderMidPrice"] = execOrder.midPrice
 

@@ -9,3 +9,4 @@ from .SPXic import SPXic
 from .CCModel import CCModel
 from .SPXButterfly import SPXButterfly
 from .SPXCondor import SPXCondor
+from .AssignmentModel import AssignmentModel

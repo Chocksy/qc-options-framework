@@ -236,7 +236,7 @@ class Base(RiskManagementModel):
         pass
 
     def shouldClose(self, position):
-        pass
+        return False, None
 
     def checkMarketCloseCutoffDttm(self, position):
         if position.strategyParam('marketCloseCutoffTime') != None:
