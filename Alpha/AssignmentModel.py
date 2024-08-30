@@ -59,8 +59,8 @@ class AssignmentModel(Base):
         self.context.structure.AddUnderlying(self, self.ticker)
 
     @classmethod
-    def handleAssignment(cls, context, assignedPosition):
-        context.logger.info(f"AssignmentModel handleAssignment called for {assignedPosition}")
+    def handleAssignment(cls, context, assignedPosition, symbol):
+        context.logger.info(f"AssignmentModel handleAssignment called for {assignedPosition} with symbol {symbol}")
 
     def getOrder(self, chain, data):
         if data.ContainsKey(self.underlyingSymbol):

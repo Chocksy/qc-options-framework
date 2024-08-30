@@ -52,7 +52,7 @@ class HandleOrderEvents:
 
         if orderEvent.IsAssignment:
             self.logger.info(f" -> Processing assignment for position: {bookPosition.orderTag}")
-            self.handleAssignment(bookPosition)
+            self.handleAssignment(bookPosition, orderEvent.Symbol)
             return
 
         self.logger.debug(f" -> Processing order id {bookPosition.orderId} (orderTag: {bookPosition.orderTag}  -  orderType: {orderType}  -  Expiry: {bookPosition.expiryStr})")
@@ -118,10 +118,10 @@ class HandleOrderEvents:
 
         return None
 
-    def handleAssignment(self, bookPosition):
+    def handleAssignment(self, bookPosition, symbol):
         strategy_class = bookPosition.strategyModule()
         if hasattr(strategy_class, 'handleAssignment'):
-            strategy_class.handleAssignment(self.context, bookPosition)
+            strategy_class.handleAssignment(self.context, bookPosition, symbol)
         else:
             self.logger.info(f"Strategy {bookPosition.strategy} does not have a handleAssignment method")
 

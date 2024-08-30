@@ -500,12 +500,13 @@ class Base(AlphaModel):
         self.stats.highOfTheDay = max(self.stats.highOfTheDay, underlying.Close())
         self.stats.lowOfTheDay = min(self.stats.lowOfTheDay, underlying.Close())
 
-    
+    # The method will be called each time a consolidator is receiving data. We have a default one of 5 minutes
+    # so if we need something to happen every 5 minutes this can be used for that.
     def dataConsolidated(self, sender, consolidated):
         pass
 
     @classmethod
-    def handleAssignment(cls, context, assignedPosition):
+    def handleAssignment(cls, context, assignedPosition, symbol):
         # Default implementation
         context.logger.info(f"Base handleAssignment called for {assignedPosition}")
         pass
