@@ -4,6 +4,7 @@ from AlgorithmImports import *
 
 from .Underlying import Underlying
 from .ProviderOptionContract import ProviderOptionContract
+from .PositionSerializer import PositionSerializer
 import operator
 
 class DataHandler:
@@ -15,6 +16,8 @@ class DataHandler:
         self.ticker = ticker
         self.context = context
         self.strategy = strategy
+        position_serializer = PositionSerializer(context)
+        self.last_run_symbols = position_serializer.get_option_symbols_from_positions()
 
     # Method to add the ticker[String] data to the context.
     # @param resolution [Resolution]
@@ -66,8 +69,9 @@ class DataHandler:
             self.context.logger.warning("No symbols provided to optionChainProviderFilter")
             return None
 
+        # filtering the symbols in minDte,maxDte and if anything stored from the last run 
         filteredSymbols = [symbol for symbol in symbols
-                            if minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte]
+                            if (minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte) or (str(symbol.value) in self.last_run_symbols)]
 
         self.context.logger.debug(f"Filtered symbols count: {len(filteredSymbols)}")
         self.context.logger.debug(f"Context Time: {self.context.Time.date()}")

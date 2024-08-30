@@ -12,7 +12,7 @@ from PortfolioConstruction import OptionsPortfolioConstruction
 from Alpha import FPLModel, CCModel, SPXic, SPXButterfly, SPXCondor
 # The execution classes
 from Initialization import SetupBaseStructure, HandleOrderEvents
-from Tools import Performance
+from Tools import Performance, PositionSerializer
 
 
 """
@@ -127,6 +127,10 @@ class CentralAlgorithm(QCAlgorithm):
         self.executionTimer.stop()
 
     def OnEndOfAlgorithm(self) -> None:
+
+        # save positions to object store
+        PositionSerializer.serialize_positions(self.allPositions, self.object_store)
+
         # Convert the dictionary into a Pandas Data Frame
         # dfAllPositions = pd.DataFrame.from_dict(self.allPositions, orient = "index")
         # Convert the dataclasses into Pandas Data Frame
