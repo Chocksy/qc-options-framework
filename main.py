@@ -128,9 +128,10 @@ class CentralAlgorithm(QCAlgorithm):
 
     def OnEndOfAlgorithm(self) -> None:
 
-        # save positions to object store
-        PositionSerializer.serialize_positions(self.allPositions, self.object_store)
-
+         # save positions to object store
+        position_serializer = PositionSerializer(self)
+        position_serializer.serialize_positions(self.allPositions, self.object_store)
+        
         # Convert the dictionary into a Pandas Data Frame
         # dfAllPositions = pd.DataFrame.from_dict(self.allPositions, orient = "index")
         # Convert the dataclasses into Pandas Data Frame
