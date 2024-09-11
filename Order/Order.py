@@ -35,7 +35,7 @@ class Order(Base):
         # Initialize the contract utils
         self.contractUtils = ContractUtils(context)
         # Initialize the Strategy Builder
-        self.strategyBuilder = OrderBuilder(context)
+        self.strategyBuilder = OrderBuilder(context, strategy)
 
     def fValue(self, spotPrice, contracts, sides=None, atTime=None, openPremium=None):
         """

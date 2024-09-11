@@ -3,6 +3,7 @@ from AlgorithmImports import *
 # endregion
 
 from Tools import Logger, ContractUtils, BSM
+from Evaluate import Evaluate
 
 class OrderBuilder:
     """
@@ -24,12 +25,13 @@ class OrderBuilder:
     #         If targetPremium != None  -> The order is executed only if the number of contracts required
     #           to reach the target credit/debit does not exceed the maxOrderQuantity
    
-    def __init__(self, context):
+    def __init__(self, context, strategy):
         self.context = context # Set the context (QCAlgorithm object)
         self.bsm = BSM(context) # Initialize the BSM pricing model
         self.logger = Logger(context, className=type(self).__name__, logLevel=context.logLevel) # Set the logger
         self.contractUtils = ContractUtils(context) # Initialize the contract utils
-
+        self.evaluator = Evaluate(context, strategy)
+        
     def optionTypeFilter(self, contract, type = None):
         """
         Filters contracts by option type (Call or Put).
@@ -524,45 +526,10 @@ class OrderBuilder:
             self.logger.error(f"Input parameter type = {type} is invalid. Valid values: 'Put'|'Call'")
             return
 
-        # Initialize the result and the best premium
-        best_spread = []
-        best_premium = -float('inf') if premiumOrder == 'max' else float('inf')
-        self.logger.debug(f"wingSize: {wingSize}, premiumOrder: {premiumOrder}, fromPrice: {fromPrice}, toPrice: {toPrice}, sortByStrike: {sortByStrike}, strike: {strike}")
-        if strike is not None:
-            wing = self.getWing(sorted_contracts, wingSize = wingSize)
-            self.logger.debug(f"STRIKE: wing: {wing}")
-            # Check if we have any contracts
-            if(len(sorted_contracts) > 0):
-                # Add the first leg
-                best_spread.append(sorted_contracts[0])
-                if wing != None:
-                    # Add the wing
-                    best_spread.append(wing)
-        else:
-            # Iterate over sorted contracts
-            for i in range(len(sorted_contracts) - 1):
-                # Get the wing
-                wing = self.getWing(sorted_contracts[i:], wingSize = wingSize)
-                self.logger.debug(f"NO STRIKE: wing: {wing}")
-                if wing is not None:
-                    # Calculate the net premium
-                    net_premium = abs(self.contractUtils.midPrice(sorted_contracts[i]) - self.contractUtils.midPrice(wing))
-                    self.logger.debug(f"fromPrice: {fromPrice} <= net_premium: {net_premium} <= toPrice: {toPrice}")
-                    # Check if the net premium is within the specified price range
-                    if fromPrice <= net_premium <= toPrice:
-                        # Check if this spread has a better premium
-                        if (premiumOrder == 'max' and net_premium > best_premium) or (premiumOrder == 'min' and net_premium < best_premium):
-                            best_spread = [sorted_contracts[i], wing]
-                            best_premium = net_premium
-
-        # By default, the legs of a spread are sorted based on their distance from the ATM strike.
-        # - For Call spreads, they are already sorted by increasing strike
-        # - For Put spreads, they are sorted by decreasing strike
-        # In some cases it might be more convenient to return the legs ordered by their strike (i.e. in case of Iron Condors/Flys)
-        if sortByStrike:
-            best_spread = sorted(best_spread, key = lambda x: x.Strike, reverse = False)
-
+        best_spread = self.evaluator.evaluate_spreads(sorted_contracts, wingSize)
+        
         return best_spread
+
 
     def getPutSpread(self, contracts, strike = None, delta = None, wingSize = None, sortByStrike = False):
         """

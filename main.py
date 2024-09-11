@@ -79,6 +79,8 @@ class CentralAlgorithm(QCAlgorithm):
         # self.SetAlpha(CCModel(self))
         # self.SetAlpha(SPXButterfly(self))
         # self.SetAlpha(SPXCondor(self))
+        # Example of a multiple alpha model - SPXic1, SPXic2, SPXic3, SPXic4 strategies/classes must be created in alpha
+        # self.SetAlpha(CompositeAlphaModel(SPXic1(self),SPXic2(self),SPXic3(self),SPXic4(self)))
 
         self.SetPortfolioConstruction(OptionsPortfolioConstruction(self))
 

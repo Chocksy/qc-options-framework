@@ -49,7 +49,7 @@ class SPXic(Base):
         "validateBidAskSpread": True,
         "marketCloseCutoffTime": time(15, 45, 0),
         # Put/Call Wing size for Iron Condor, Iron Fly
-        "putWingSize": 10,
+        "putWingSize": 10, # you can also use a list of wingSizes, and then use evaluator to choose [5,10],
         "callWingSize": 10,
         # "targetPremium": 500,
     }
