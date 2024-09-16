@@ -155,6 +155,10 @@ class PositionsStore:
             decoder = PositionDecoder(self.context)
             unpacked_positions = decoder.decode(json_data)
             self.context.allPositions = unpacked_positions
+
+            # Add positions with future expiry and not closed to openPositions
+            for position in unpacked_positions.values():
+                if position.expiry and position.expiry.date() > self.context.Time.date() and not position.closeOrder.filled:
+                    self.context.openPositions[position.orderTag] = position.orderId
         except Exception as e:
             self.context.logger.error(f"Error reading or deserializing JSON data: {e}")
-
