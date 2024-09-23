@@ -13,6 +13,9 @@ class ProviderOptionContract:
         self.ID = symbol.ID
         self.UnderlyingLastPrice = underlying_price
         self.security = context.Securities[symbol]
+        self.context = context
+        self.right = OptionRight.CALL if self.ID.option_right == OptionRight.PUT else OptionRight.PUT
+        self.mirror_symbol = Symbol.create_option(self.ID.underlying.symbol, self.ID.market, self.ID.option_style, self.right, self.ID.strike_price, self.ID.date)
 
     @property
     def Expiry(self):
@@ -46,4 +49,9 @@ class ProviderOptionContract:
     def OpenInterest(self):
         return self.security.OpenInterest
 
+    @property
+    def implied_volatility(self):
+        return self.context.iv(self.symbol, self.mirror_symbol, resolution=Resolution.HOUR)
+
+    
     # Add any other properties or methods you commonly use from OptionContract
