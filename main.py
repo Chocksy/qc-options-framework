@@ -12,7 +12,7 @@ from PortfolioConstruction import OptionsPortfolioConstruction
 from Alpha import FPLModel, CCModel, SPXic, SPXButterfly, SPXCondor, AssignmentModel
 # The execution classes
 from Initialization import SetupBaseStructure, HandleOrderEvents
-from Tools import Performance
+from Tools import Performance, PositionsStore
 
 
 """
@@ -73,6 +73,9 @@ class CentralAlgorithm(QCAlgorithm):
 
         self.performance = Performance(self)
 
+        self.positions_store = PositionsStore(self)
+        self.positions_store.load_positions()
+
         # Set the algorithm framework models
         # self.SetAlpha(FPLModel(self))
         # self.SetAlpha(SPXic(self))
@@ -129,6 +132,7 @@ class CentralAlgorithm(QCAlgorithm):
         self.executionTimer.stop()
 
     def OnEndOfAlgorithm(self) -> None:
+        self.positions_store.store_positions()
         # Convert the dictionary into a Pandas Data Frame
         # dfAllPositions = pd.DataFrame.from_dict(self.allPositions, orient = "index")
         # Convert the dataclasses into Pandas Data Frame

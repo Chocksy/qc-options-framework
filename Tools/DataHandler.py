@@ -61,7 +61,7 @@ class DataHandler:
     def optionChainProviderFilter(self, symbols, min_strike_rank, max_strike_rank, minDte, maxDte):
         self.context.executionTimer.start('Tools.DataHandler -> optionChainProviderFilter')
         self.context.logger.debug(f"optionChainProviderFilter -> symbols count: {len(symbols)}")
-        
+
         if len(symbols) == 0:
             self.context.logger.warning("No symbols provided to optionChainProviderFilter")
             return None
@@ -74,7 +74,7 @@ class DataHandler:
         unique_dates = set(symbol.ID.Date.date() for symbol in symbols)
         self.context.logger.debug(f"Unique symbol dates: {unique_dates}")
         self.context.logger.debug(f"optionChainProviderFilter -> filteredSymbols: {filteredSymbols}")
-        
+
         if not filteredSymbols:
             self.context.logger.warning("No symbols left after date filtering")
             return None
@@ -111,7 +111,7 @@ class DataHandler:
 
         selectedSymbols = [symbol for symbol in filteredSymbols
                                 if min_strike <= symbol.ID.StrikePrice <= max_strike]
-        
+
         self.context.logger.debug(f"Selected symbols count: {len(selectedSymbols)}")
 
         contracts = []
@@ -174,7 +174,7 @@ class DataHandler:
             return Symbol.create_canonical_option(underlyingSymbol, "SPXW", Market.USA, "?SPXW")
         else:
             return Symbol.create_canonical_option(underlyingSymbol, Market.USA, f"?{self.ticker}")
-            
+
 
     # PRIVATE METHODS
 
