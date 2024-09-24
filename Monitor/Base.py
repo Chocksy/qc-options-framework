@@ -41,10 +41,11 @@ class Base(RiskManagementModel):
         "capStopLoss": True,
     }
 
-    def __init__(self, context):
+    def __init__(self, context, strategy_id = 'Base'):
         self.context = context
         self.context.structure.AddConfiguration(parent=self, **self.getMergedParameters())
         self.context.logger.debug(f"{self.__class__.__name__} -> __init__")
+        self.context.strategyMonitors[strategy_id] = self
 
     @classmethod
     def getMergedParameters(cls):
@@ -74,7 +75,7 @@ class Base(RiskManagementModel):
         """
         Manages the risk of the current open positions and determines which positions, if any, should be closed based on various risk management criteria.
 
-        This method overrides the provided `targets` with a new list of portfolio targets based on the evaluation of current open positions. The method checks the positions against multiple risk thresholds such as stop loss, profit target, days in trade (DIT), and days to expiration (DTE), among others.
+        This method overrides the provided `targets` with a new list of portfolio targets based on the evaluation of current open positions. The method checks the positions against multiple risk thresholds such as stop loss, profit target, DIT/DTE thresholds, expiration date, and custom conditions.
         
         The method follows these steps:
             1. Checks if the current time aligns with the specified schedule (`managePositionFrequency`). If not, it returns an empty list.
@@ -103,9 +104,6 @@ class Base(RiskManagementModel):
         if self.context.Time.minute % managePositionFrequency != 0:
             return []
 
-        # Method to allow child classes access to the manageRisk method before any changes are made
-        self.preManageRisk()
-        self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> preManageRisk")
         # Loop through all open positions
         for orderTag, orderId in list(self.context.openPositions.items()):
             # Skip this contract if in the meantime it has been removed by the onOrderEvent
@@ -120,6 +118,14 @@ class Base(RiskManagementModel):
             orderTag = bookPosition.orderTag
 
             self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId}")
+
+            # Find the appropriate monitor for this position's strategy
+            strategy_monitor = self.context.strategyMonitors.get(bookPosition.strategyId, self.context.strategyMonitors.get('Base'))
+
+            if strategy_monitor: 
+                # Method to allow child classes access to the manageRisk method before any changes are made
+                strategy_monitor.preManageRisk() 
+                self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> preManageRisk")
 
             # Check if this is a fully filled position
             if bookPosition.openOrder.filled is False:
@@ -151,7 +157,7 @@ class Base(RiskManagementModel):
             self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId} -> bookPosition: {bookPosition}")
 
             # Special method to monitor the position and handle custom actions on it.
-            self.monitorPosition(bookPosition)
+            if strategy_monitor: strategy_monitor.monitorPosition(bookPosition)
 
             # Initialize the closeReason
             closeReason = []
@@ -192,12 +198,16 @@ class Base(RiskManagementModel):
                 stopLossFlg = True
 
             # Check any custom condition from the strategy to determine closure.
-            shouldCloseFlg, customReasons = self.shouldClose(bookPosition)
-            if shouldCloseFlg:
-                closeReason.append(customReasons or "It should close from child")
+            shouldCloseFlg = False
+            customReasons = None
+            if strategy_monitor:
+                shouldCloseFlg, customReasons = strategy_monitor.shouldClose(bookPosition)
 
-            # A custom method to handle
-            self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId} -> shouldCloseFlg: {shouldCloseFlg}, customReasons: {customReasons}")
+                if shouldCloseFlg:
+                    closeReason.append(customReasons or "It should close from child")
+
+                    # A custom method to handle
+                    self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId} -> shouldCloseFlg: {shouldCloseFlg}, customReasons: {customReasons}")
 
             # Update the stats of each contract
             # TODO: add back this section

@@ -112,6 +112,9 @@ class SetupBaseStructure:
         # we want to call some general method.
         self.context.strategies = []
 
+        # Keep track of all strategy monitors
+        self.context.strategyMonitors = {}
+
         # Array to keep track of consolidators
         self.context.consolidators = {}
 
@@ -148,7 +151,7 @@ class SetupBaseStructure:
             security (Security): The security object to initialize.
         """
         self.context.logger.debug(f"{self.__class__.__name__} -> CompleteSecurityInitializer -> Security: {security}")
-        
+
         # Disable buying power on the security: https://www.quantconnect.com/docs/v2/writing-algorithms/live-trading/trading-and-orders#10-Disable-Buying-Power
         security.set_buying_power_model(BuyingPowerModel.NULL)
 
@@ -206,7 +209,7 @@ class SetupBaseStructure:
     def ClearSecurity(self, security: Security) -> None:
         """
         Remove any additional data or settings associated with the security.
-    
+
         Args:
             security (Security): The security object to be cleared.
         """
@@ -262,7 +265,7 @@ class SetupBaseStructure:
 
         # Store the symbol for the option and the underlying
         strategy.underlyingSymbol = underlying.Symbol
-        
+
         # REGION FOR USING SLICE INSTEAD OF PROVIDER
         if strategy.useSlice:
             option = strategy.dataHandler.AddOptionsChain(underlying, self.context.timeResolution)
@@ -272,7 +275,7 @@ class SetupBaseStructure:
             strategy.optionSymbol = option.Symbol
         else:
             strategy.optionSymbol = None
-        
+
         # Set the benchmark.
         self.context.SetBenchmark(underlying.Symbol)
         self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Benchmark: {self.context.Benchmark}")
