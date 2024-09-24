@@ -188,11 +188,12 @@ class SetupBaseStructure:
             mirror_symbol = Symbol.create_option(security.symbol.ID.underlying.symbol, security.symbol.ID.market, security.symbol.ID.option_style, right, security.symbol.ID.strike_price, security.symbol.ID.date)
             try:
                 security.iv = self.context.iv(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                # security.delta = self.context.d(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                # security.gamma = self.context.g(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                # security.vega = self.context.v(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                # security.rho = self.context.r(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                # security.theta = self.context.t(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.delta = self.context.d(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.gamma = self.context.g(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.vega = self.context.v(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.rho = self.context.r(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.theta = self.context.t(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                
             except Exception as e:
                 self.context.logger.warning(f"Security Initializer: Data not available: {e}") 
                 
