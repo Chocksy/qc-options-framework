@@ -14,7 +14,35 @@ class ProviderOptionContract:
         self.UnderlyingLastPrice = underlying_price
         self.security = context.Securities[symbol]
         self.context = context
-    
+        # Instantiate the custom Greeks object
+        self.greeks = self.Greeks(context, self.security)
+
+    class Greeks:
+        def __init__(self, context, security):
+            self.context = context
+            self.security = security
+            
+        @property
+        def delta(self):
+            return self.security.delta.current.value if self.security.delta else 0
+
+        @property
+        def gamma(self):
+            return self.security.gamma.current.value if self.security.gamma else 0
+
+        @property
+        def theta(self):
+            return self.security.theta.current.value if self.security.theta else 0
+
+        @property
+        def vega(self):
+            return self.security.vega.current.value if self.security.vega else 0
+
+        @property
+        def rho(self):
+            return self.security.rho.current.value if self.security.rho else 0
+
+
     @property
     def Expiry(self):
         return self.ID.Date
