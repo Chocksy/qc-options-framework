@@ -15,10 +15,10 @@ class LimitOrderHandlerWithCombo:
         contractUtils (ContractUtils): Utility class for managing and retrieving data about financial contracts.
         logger (Logger): Provides logging functionality to record the operational process and outputs.
         bsm (BSM): Black-Scholes-Merton model used for options pricing and risk management calculations.
-        
+
     Methods:
         call(self, position, order): Initiates the processing of limit orders for a given trading position based on the current market and position state.
-        makeLimitOrder(self, position, order, retry=False): Processes and sends out new limit orders or updates existing ones based on the strategy’s requirements.
+        makeLimitOrder(self, position, order, retry=False): Processes and sends out new limit orders or updates existing ones based on the strategy's requirements.
         updateComboLimitOrder(self, position, order, orderTransactionIds): Updates existing combo limit orders with new pricing information as market conditions change.
         calculateNewLimitPrice(self, position, execOrder, limitOrderPrice, retries, nrContracts, orderType): Calculates a new price for limit orders, factoring in market shifts and strategy-defined adjustments.
         logOrderDetails(self, position, order): Logs detailed information about orders being processed to aid in debugging and monitoring.

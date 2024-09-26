@@ -203,16 +203,6 @@ class Base(AlphaModel):
         self.order = Order(context, self)
         self.logger.debug(f'{self.name} -> __init__')
 
-    @staticmethod
-    def getNextOrderId():
-        """
-        Generates a unique order ID for tracking and management.
-
-        Returns:
-            int: A unique identifier for a new order.
-        """
-        Base.orderCount += 1
-        return Base.orderCount
 
     @classmethod
     def getMergedParameters(cls):
@@ -366,24 +356,12 @@ class Base(AlphaModel):
         # Stop the timer
         self.context.executionTimer.stop('Alpha.Base -> CreateInsights')
         return insights
-    
+
     def hasOneDuplicateLeg(self, order):
         # Check if checkForDuplicatePositions is enabled
         if not self.checkForOneDuplicateLeg:
             return False
 
-
-    def buildOrderPosition(self, order, lastClosedOrderTag=None):
-        """
-        Builds a trading position from a given order specification.
-
-        Args:
-            order: The order details from which to build the position.
-            lastClosedOrderTag: Optional tag of a recently closed order for reference.
-
-        Returns:
-            tuple: Contains the newly created position and its associated working order.
-        """
         # Get the context
         context = self.context
 
@@ -412,7 +390,6 @@ class Base(AlphaModel):
 
         return False
 
-
     def hasDuplicateLegs(self, order):
         """
         Checks if an order has duplicate legs compared to currently open positions.
@@ -422,7 +399,7 @@ class Base(AlphaModel):
 
         Args:
             order (dict): The order details.
-            
+
         Returns:
             bool: True if the order contains duplicate legs compared to open positions, False otherwise.
 

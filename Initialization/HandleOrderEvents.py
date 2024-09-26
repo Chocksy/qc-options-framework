@@ -163,7 +163,8 @@ class HandleOrderEvents:
     def handleClosedPosition(self, bookPosition, contract):
         positionPnL = bookPosition.openPremium + bookPosition.closePremium
         bookPosition.PnL = positionPnL
-        self.context.openPositions.pop(bookPosition.orderTag)
+        if bookPosition.orderTag in self.context.openPositions:
+            self.context.openPositions.pop(bookPosition.orderTag)
 
         closeDte = (contract.Expiry.date() - self.context.Time.date()).days
         closeTradeInfo = {"orderTag": bookPosition.orderTag, "closeDte": closeDte}
