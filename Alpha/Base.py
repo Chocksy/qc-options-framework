@@ -306,9 +306,6 @@ class Base(AlphaModel):
         self.order.updateChain(chain)
         # Call the getOrder method of the class implementing OptionStrategy
         order = self.getOrder(chain, data)
-
-        self.context.debug(str(order))
-
         # Execute the order
         # Exit if there is no order to process
         if order is None:

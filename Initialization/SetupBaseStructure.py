@@ -361,7 +361,8 @@ class SetupBaseStructure:
         for orderTag, orderId in list(self.context.openPositions.items()):
             position = self.context.allPositions[orderId]
             # Check if we need to cancel the order
-            if any(self.context.Time > leg.expiry for leg in position.legs):
+            if any(leg is not None and leg.expiry is not None and isinstance(leg.expiry, datetime) and self.context.Time > leg.expiry for leg in position.legs):
+
                 # Remove this position from the list of open positions
                 self.context.charting.updateStats(position)
                 self.context.logger.debug(f"  >>>  EXPIRED POSITION-----> Removing expired position {orderTag} from the algorithm.")

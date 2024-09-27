@@ -49,7 +49,7 @@ class CentralAlgorithm(QCAlgorithm):
         #  -> 2 = INFO
         #  -> 3 = DEBUG
         #  -> 4 = TRACE (Attention!! This can consume your entire daily log limit)
-        self.logLevel = 0 if self.LiveMode else 3
+        self.logLevel = 0 if self.LiveMode else 0
 
 
         # Set the initial account value
