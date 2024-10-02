@@ -327,9 +327,14 @@ class Base(AlphaModel):
 
             self.logger.debug(f"CreateInsights -> position: {position}")
             self.logger.debug(f"CreateInsights -> workingOrder: {workingOrder}")
+            
             if position is None:
                 continue
             
+            if self.hasOneDuplicateLeg(single_order):
+                self.logger.debug(f"CreateInsights -> Duplicate leg found in order: {single_order}")
+                continue
+
             orderId = position.orderId
             orderTag = position.orderTag
             insights.extend(workingOrder.insights)
@@ -343,10 +348,6 @@ class Base(AlphaModel):
 
             # Map each contract to the openPosition dictionary (key: expiryStr)
             context.workingOrders[orderTag] = workingOrder
-            
-            if self.hasOneDuplicateLeg(single_order):
-                self.logger.debug(f"CreateInsights -> Duplicate leg found in order: {single_order}")
-                continue
 
             
         self.logger.debug(f"CreateInsights -> insights: {insights}")
