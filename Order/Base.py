@@ -173,5 +173,14 @@ class Base:
 
     @staticmethod
     def getNextOrderId():
-        Base.orderCount += 1
+        try:
+            max_order_id = max(orderId for _, orderId in self.context.openPositions.items())
+        except:
+            max_order_id = 0
+
+        if max_order_id > 0 and Base.orderCount == 0:
+            Base.orderCount = max_order_id + 1
+        else:
+            Base.orderCount += 1
+            
         return Base.orderCount

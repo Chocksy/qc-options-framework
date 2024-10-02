@@ -161,15 +161,26 @@ class HandleOrderEvents:
             execOrder.premium = bookPosition.openPremium / 100
 
     def handleClosedPosition(self, bookPosition, contract):
+        # Calculate position PnL
         positionPnL = bookPosition.openPremium + bookPosition.closePremium
         bookPosition.PnL = positionPnL
+
+        # Safely remove the position from openPositions if it exists
         if bookPosition.orderTag in self.context.openPositions:
             self.context.openPositions.pop(bookPosition.orderTag)
+            self.context.logger.debug(f"Closed position: {bookPosition.orderTag} removed from openPositions.")
+        else:
+            self.context.logger.warning(f"Attempted to remove position {bookPosition.orderTag} but it was not found in openPositions.")
 
+        # Calculate days to expiry (DTE) for the contract
         closeDte = (contract.Expiry.date() - self.context.Time.date()).days
         closeTradeInfo = {"orderTag": bookPosition.orderTag, "closeDte": closeDte}
+
+        # Add trade info to recently closed positions list
         self.context.recentlyClosedDTE.append(closeTradeInfo)
 
+        # Update charting statistics for the closed position
         self.context.charting.updateStats(bookPosition)
+
 
 # ENDsection: handle order events from main.py
