@@ -74,15 +74,20 @@ class CentralAlgorithm(QCAlgorithm):
         self.performance = Performance(self)
 
         self.positions_store = PositionsStore(self)
-        self.positions_store.load_positions()
+
+        # load previous positions if we are in live mode 
+        if self.LiveMode:
+            self.positions_store.load_positions()
+
+            
 
         # Set the algorithm framework models
         # self.SetAlpha(FPLModel(self))
-        # self.SetAlpha(SPXic(self))
+        self.SetAlpha(SPXic(self))
         # self.SetAlpha(CCModel(self))
         # self.SetAlpha(SPXButterfly(self))
         # self.SetAlpha(SPXCondor(self))
-        self.SetAlpha(AssignmentModel(self))
+        # self.SetAlpha(AssignmentModel(self))
 
         self.SetPortfolioConstruction(OptionsPortfolioConstruction(self))
 
@@ -93,10 +98,10 @@ class CentralAlgorithm(QCAlgorithm):
         # self.SetExecution(SmartPricingExecutionModel(self))
         # self.SetExecution(ImmediateExecutionModel())
 
-        self.SetRiskManagement(NoStopLossModel(self))
+        # self.SetRiskManagement(NoStopLossModel(self))
         # self.SetRiskManagement(StopLossModel(self))
         # self.SetRiskManagement(FPLMonitorModel(self))
-        # self.SetRiskManagement(SPXicMonitor(self))
+        self.SetRiskManagement(SPXicMonitor(self))
         # self.SetRiskManagement(CCMonitor(self))
         # self.SetRiskManagement(SPXButterflyMonitor(self))
         # self.SetRiskManagement(SPXCondorMonitor(self))
@@ -132,7 +137,10 @@ class CentralAlgorithm(QCAlgorithm):
         self.executionTimer.stop()
 
     def OnEndOfAlgorithm(self) -> None:
-        self.positions_store.store_positions()
+        # store positions in live mode 
+        if self.LiveMode:
+            self.positions_store.store_positions()
+
         # Convert the dictionary into a Pandas Data Frame
         # dfAllPositions = pd.DataFrame.from_dict(self.allPositions, orient = "index")
         # Convert the dataclasses into Pandas Data Frame
