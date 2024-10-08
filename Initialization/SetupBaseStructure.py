@@ -178,7 +178,23 @@ class SetupBaseStructure:
             for time, row in history.loc[security.Symbol].iterrows():
                 trade_bar = TradeBar(time, security.Symbol, row.open, row.high, row.low, row.close, row.volume)
                 security.VolatilityModel.Update(security, trade_bar)
+        elif security.Type == SecurityType.FutureOption:
+            # New handling for FutureOptions
+            security.SetFillModel(BetaFillModel(self.context))
+            security.SetFeeModel(TastyWorksFeeModel())
+            security.PriceModel = OptionPriceModels.CrankNicolsonFD()
+            security.SetOptionAssignmentModel(NullOptionAssignmentModel())
 
+            # Initialize Greeks or any other specific models for FutureOptions
+            try:
+                security.iv = self.context.iv(security.symbol, security.symbol, resolution=self.context.timeResolution)
+                security.delta = self.context.d(security.symbol, security.symbol, resolution=self.context.timeResolution)
+                security.gamma = self.context.g(security.symbol, security.symbol, resolution=self.context.timeResolution)
+                security.vega = self.context.v(security.symbol, security.symbol, resolution=self.context.timeResolution)
+                security.rho = self.context.r(security.symbol, security.symbol, resolution=self.context.timeResolution)
+                security.theta = self.context.t(security.symbol, security.symbol, resolution=self.context.timeResolution)
+            except Exception as e:
+                self.context.logger.warning(f"FutureOption Initializer: Data not available: {e}") 
         elif security.Type in [SecurityType.Option, SecurityType.IndexOption]:
             # This is for options.
             security.SetFillModel(BetaFillModel(self.context))
@@ -196,11 +212,10 @@ class SetupBaseStructure:
                 security.vega = self.context.v(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
                 security.rho = self.context.r(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
                 security.theta = self.context.t(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                
+
             except Exception as e:
                 self.context.logger.warning(f"Security Initializer: Data not available: {e}") 
-                
-                
+
         if security.Type == SecurityType.IndexOption:
             # disable option assignment. This is important for SPX but we disable for all for now.
             security.SetOptionAssignmentModel(NullOptionAssignmentModel())
@@ -267,14 +282,9 @@ class SetupBaseStructure:
         strategy.underlyingSymbol = underlying.Symbol
 
         # REGION FOR USING SLICE INSTEAD OF PROVIDER
+        strategy.optionSymbol = None
         if strategy.useSlice:
-            option = strategy.dataHandler.AddOptionsChain(underlying, self.context.timeResolution)
-            # Set the option chain filter function
-            option.SetFilter(strategy.dataHandler.SetOptionFilter)
-            self.context.logger.debug(f"{self.__class__.__name__} -> AddUnderlying -> Option: {option}")
-            strategy.optionSymbol = option.Symbol
-        else:
-            strategy.optionSymbol = None
+            strategy.dataHandler.SetOptionFilter(underlying)
 
         # Set the benchmark.
         self.context.SetBenchmark(underlying.Symbol)
