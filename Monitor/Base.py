@@ -46,6 +46,7 @@ class Base(RiskManagementModel):
         self.context.structure.AddConfiguration(parent=self, **self.getMergedParameters())
         self.context.logger.debug(f"{self.__class__.__name__} -> __init__")
         self.context.strategyMonitors[strategy_id] = self
+        self.strategy_id = strategy_id
 
     @classmethod
     def getMergedParameters(cls):
@@ -118,9 +119,11 @@ class Base(RiskManagementModel):
             orderTag = bookPosition.orderTag
 
             self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId}")
-
+            
+            self.context.debug(str(self.strategy_id))
+            
             # Find the appropriate monitor for this position's strategy
-            strategy_monitor = self.context.strategyMonitors.get(bookPosition.strategyId, self.context.strategyMonitors.get('Base'))
+            strategy_monitor = self.context.strategyMonitors.get(self.strategy_id, self.context.strategyMonitors.get('Base'))
 
             if strategy_monitor: 
                 # Method to allow child classes access to the manageRisk method before any changes are made
