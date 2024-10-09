@@ -53,7 +53,7 @@ class DataHandler:
             # Add future options using AddOptionsChain
             self.AddOptionsChain(underlying, self.context.timeResolution)
             # Create canonical symbol for the mapped future contract
-            self.strategy.optionSymbol = Symbol.CreateCanonicalOption(underlying.Symbol)
+            self.strategy.optionSymbol = self.OptionsContract(underlying.Symbol)
         else:
             option = self.AddOptionsChain(underlying, self.context.timeResolution)
             option.SetFilter(self.OptionFilterFunction)
@@ -139,17 +139,12 @@ class DataHandler:
         self.context.logger.debug(f"getOptionContracts -> maxDte: {maxDte}")
 
         if self.strategy.useSlice and slice is not None:
-            if self.is_future_option:
-                for chain in slice.FutureOptionChains.Values:
-                    if chain.Underlying == self.strategy.underlyingSymbol:
-                        contracts = list(chain.Contracts.Values)
-            else:
-                # Existing handling for equity options
-                for chain in slice.OptionChains:
-                    if self.strategy.optionSymbol == None or chain.Key != self.strategy.optionSymbol:
-                        continue
-                    if chain.Value.Contracts.Count != 0:
-                        contracts = list(chain.Value)
+            # Existing handling for equity options
+            for chain in slice.OptionChains:
+                if self.strategy.optionSymbol == None or chain.Key != self.strategy.optionSymbol:
+                    continue
+                if chain.Value.Contracts.Count != 0:
+                    contracts = list(chain.Value)
             self.context.logger.debug(f"getOptionContracts -> number of contracts from slice: {len(contracts) if contracts else 0}")
 
         if contracts is None:
@@ -182,7 +177,7 @@ class DataHandler:
         if self.ticker == "SPX":
             return Symbol.create_canonical_option(underlyingSymbol, "SPXW", Market.USA, "?SPXW")
         elif self.is_future_option:
-            return Symbol.CreateCanonicalFutureOption(underlyingSymbol)
+            return Symbol.create_canonical_option(underlyingSymbol)
         else:
             return Symbol.create_canonical_option(underlyingSymbol, Market.USA, f"?{self.ticker}")
 
