@@ -15,6 +15,7 @@ class DataHandler:
         self.ticker = ticker
         self.context = context
         self.strategy = strategy
+        self.is_future_option = self.__FutureTicker()  # Flag to identify if we're dealing with future options
 
     # Method to add the ticker[String] data to the context.
     # @param resolution [Resolution]
@@ -22,6 +23,8 @@ class DataHandler:
     def AddUnderlying(self, resolution=Resolution.Minute):
         if self.__CashTicker():
             return self.context.AddIndex(self.ticker, resolution=resolution)
+        elif self.__FutureTicker():
+            return self.context.AddFuture(self.ticker, resolution=resolution)
         else:
             return self.context.AddEquity(self.ticker, resolution=resolution)
 
@@ -30,32 +33,34 @@ class DataHandler:
     # @param resolution [Resolution]
     def AddOptionsChain(self, underlying, resolution=Resolution.Minute):
         if self.ticker == "SPX":
-            # Underlying is SPX. We'll load and use SPXW and ignore SPX options (these close in the AM)
             return self.context.AddIndexOption(underlying.Symbol, "SPXW", resolution)
         elif self.__CashTicker():
-            # Underlying is an index
             return self.context.AddIndexOption(underlying.Symbol, resolution)
+        elif self.is_future_option:
+            return self.context.AddFutureOption(underlying.Symbol, self.FutureOptionFilterFunction)
         else:
-            # Underlying is an equity
             return self.context.AddOption(underlying.Symbol, resolution)
 
     # Should be called on an option object like this: option.SetFilter(self.OptionFilter)
     # !This method is called every minute if the algorithm resolution is set to minute
-    def SetOptionFilter(self, universe):
-        # Start the timer
+    def SetOptionFilter(self, underlying):
         self.context.executionTimer.start('Tools.DataHandler -> SetOptionFilter')
-        self.context.logger.debug(f"SetOptionFilter -> universe: {universe}")
-        # Include Weekly contracts
-        # nStrikes contracts to each side of the ATM
-        # Contracts expiring in the range (DTE-5, DTE)
-        filteredUniverse = universe.Strikes(-self.strategy.nStrikesLeft, self.strategy.nStrikesRight)\
-                                   .Expiration(max(0, self.strategy.dte - self.strategy.dteWindow), max(0, self.strategy.dte))\
-                                   .IncludeWeeklys()
-        self.context.logger.debug(f"SetOptionFilter -> filteredUniverse: {filteredUniverse}")
-        # Stop the timer
-        self.context.executionTimer.stop('Tools.DataHandler -> SetOptionFilter')
+        self.context.logger.debug(f"SetOptionFilter -> underlying: {underlying}")
 
-        return filteredUniverse
+        if self.is_future_option:
+            # For future options, we set the filter on the underlying future
+            underlying.SetFilter(0, 182)  # Filter for futures expiring within the next 182 days
+            # Add future options using AddOptionsChain
+            self.AddOptionsChain(underlying, self.context.timeResolution)
+            # Create canonical symbol for the mapped future contract
+            self.strategy.optionSymbol = self.OptionsContract(underlying.Symbol)
+        else:
+            option = self.AddOptionsChain(underlying, self.context.timeResolution)
+            option.SetFilter(self.OptionFilterFunction)
+            self.strategy.optionSymbol = option.Symbol
+
+        self.context.logger.debug(f"{self.__class__.__name__} -> SetOptionFilter -> Option Symbol: {self.strategy.optionSymbol}")
+        self.context.executionTimer.stop('Tools.DataHandler -> SetOptionFilter')
 
     # SECTION BELOW HANDLES OPTION CHAIN PROVIDER METHODS
     def optionChainProviderFilter(self, symbols, min_strike_rank, max_strike_rank, minDte, maxDte):
@@ -133,20 +138,20 @@ class DataHandler:
         self.context.logger.debug(f"getOptionContracts -> minDte: {minDte}")
         self.context.logger.debug(f"getOptionContracts -> maxDte: {maxDte}")
 
-        if self.strategy.useSlice:
+        if self.strategy.useSlice and slice is not None:
+            # Existing handling for equity options
             for chain in slice.OptionChains:
                 if self.strategy.optionSymbol == None or chain.Key != self.strategy.optionSymbol:
                     continue
                 if chain.Value.Contracts.Count != 0:
-                    contracts = [
-                        contract for contract in chain.Value if minDte <= (contract.Expiry.date() - self.context.Time.date()).days <= maxDte
-                    ]
+                    contracts = list(chain.Value)
             self.context.logger.debug(f"getOptionContracts -> number of contracts from slice: {len(contracts) if contracts else 0}")
 
         if contracts is None:
-            canonical_symbol = self.OptionsContract(self.strategy.underlyingSymbol)
-            symbols = self.context.OptionChainProvider.GetOptionContractList(canonical_symbol, self.context.Time)
-            contracts = self.optionChainProviderFilter(symbols, -self.strategy.nStrikesLeft, self.strategy.nStrikesRight, minDte, maxDte)
+            if not self.is_future_option:
+                canonical_symbol = self.OptionsContract(self.strategy.underlyingSymbol)
+                symbols = self.context.OptionChainProvider.GetOptionContractList(canonical_symbol, self.context.Time)
+                contracts = self.optionChainProviderFilter(symbols, -self.strategy.nStrikesLeft, self.strategy.nStrikesRight, minDte, maxDte)
 
         self.context.executionTimer.stop('Tools.DataHandler -> getOptionContracts')
 
@@ -158,28 +163,42 @@ class DataHandler:
     # @return [Symbol]
     def AddOptionContracts(self, contracts, resolution = Resolution.Minute):
         # Add this contract to the data subscription so we can retrieve the Bid/Ask price
-        if self.__CashTicker():
-            for contract in contracts:
-                if contract not in self.context.optionContractsSubscriptions:
+        for contract in contracts:
+            if contract not in self.context.optionContractsSubscriptions:
+                if self.is_future_option:
+                    self.context.AddFutureOptionContract(contract, resolution)
+                elif self.__CashTicker():
                     self.context.AddIndexOptionContract(contract, resolution)
-                    self.context.optionContractsSubscriptions.append(contract)
-        else:
-            for contract in contracts:
-                if contract not in self.context.optionContractsSubscriptions:
+                else:
                     self.context.AddOptionContract(contract, resolution)
-                    self.context.optionContractsSubscriptions.append(contract)
+                self.context.optionContractsSubscriptions.append(contract)
 
     def OptionsContract(self, underlyingSymbol):
         if self.ticker == "SPX":
             return Symbol.create_canonical_option(underlyingSymbol, "SPXW", Market.USA, "?SPXW")
+        elif self.is_future_option:
+            return Symbol.create_canonical_option(underlyingSymbol)
         else:
             return Symbol.create_canonical_option(underlyingSymbol, Market.USA, f"?{self.ticker}")
 
-
     # PRIVATE METHODS
+
+    def __FutureTicker(self):
+        # Implement logic to determine if the ticker is a future
+        return self.ticker in [Futures.Indices.SP_500_E_MINI]
 
     # Internal method to determine if we are using a cashticker to add the data.
     # @returns [Boolean]
     def __CashTicker(self):
         return self.ticker in self.CashIndices
 
+    def OptionFilterFunction(self, universe):
+        return universe.Strikes(-self.strategy.nStrikesLeft, self.strategy.nStrikesRight) \
+                       .Expiration(max(0, self.strategy.dte - self.strategy.dteWindow), max(0, self.strategy.dte)) \
+                       .IncludeWeeklys()
+
+    def FutureOptionFilterFunction(self, universe):
+        return (universe
+                .IncludeWeeklys()
+                .Strikes(-self.strategy.nStrikesLeft, self.strategy.nStrikesRight)
+                .Expiration(max(0, self.strategy.dte - self.strategy.dteWindow), max(0, self.strategy.dte)))
