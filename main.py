@@ -9,7 +9,7 @@ from Execution import AutoExecutionModel, SmartPricingExecutionModel, SPXExecuti
 from Monitor import HedgeRiskManagementModel, NoStopLossModel, StopLossModel, FPLMonitorModel, SPXicMonitor, CCMonitor, SPXButterflyMonitor, SPXCondorMonitor
 from PortfolioConstruction import OptionsPortfolioConstruction
 # The alpha models
-from Alpha import FPLModel, CCModel, SPXic, SPXButterfly, SPXCondor, AssignmentModel
+from Alpha import FPLModel, CCModel, SPXic, SPXButterfly, SPXCondor, AssignmentModel, FutureSpread
 # The execution classes
 from Initialization import SetupBaseStructure, HandleOrderEvents
 from Tools import Performance, PositionsStore
@@ -49,7 +49,7 @@ class CentralAlgorithm(QCAlgorithm):
         #  -> 2 = INFO
         #  -> 3 = DEBUG
         #  -> 4 = TRACE (Attention!! This can consume your entire daily log limit)
-        self.logLevel = 0 if self.LiveMode else 0
+        self.logLevel = 0 if self.LiveMode else 1
 
 
         # Set the initial account value
@@ -73,21 +73,21 @@ class CentralAlgorithm(QCAlgorithm):
 
         self.performance = Performance(self)
 
+        # Load the positions from the positions store
         self.positions_store = PositionsStore(self)
-
         # load previous positions if we are in live mode 
         if self.LiveMode:
             self.positions_store.load_positions()
 
-            
-
         # Set the algorithm framework models
         # self.SetAlpha(FPLModel(self))
-        self.SetAlpha(SPXic(self))
+        # self.SetAlpha(SPXic(self))
         # self.SetAlpha(CCModel(self))
         # self.SetAlpha(SPXButterfly(self))
         # self.SetAlpha(SPXCondor(self))
         # self.SetAlpha(AssignmentModel(self))
+        # Use the FutureSpread alpha model
+        self.SetAlpha(FutureSpread(self))
 
         self.SetPortfolioConstruction(OptionsPortfolioConstruction(self))
 
@@ -137,7 +137,7 @@ class CentralAlgorithm(QCAlgorithm):
         self.executionTimer.stop()
 
     def OnEndOfAlgorithm(self) -> None:
-        # store positions in live mode 
+        # store positions in live mode
         if self.LiveMode:
             self.positions_store.store_positions()
 
