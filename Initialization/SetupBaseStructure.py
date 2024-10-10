@@ -186,15 +186,20 @@ class SetupBaseStructure:
             security.SetOptionAssignmentModel(NullOptionAssignmentModel())
 
             # Initialize Greeks or any other specific models for FutureOptions
+            right = OptionRight.CALL if security.symbol.ID.option_right == OptionRight.PUT else OptionRight.PUT
+            mirror_symbol = Symbol.create_option(security.symbol.ID.underlying.symbol, security.symbol.ID.market, security.symbol.ID.option_style, right, security.symbol.ID.strike_price, security.symbol.ID.date)
+            
             try:
-                security.iv = self.context.iv(security.symbol, security.symbol, resolution=self.context.timeResolution)
-                security.delta = self.context.d(security.symbol, security.symbol, resolution=self.context.timeResolution)
-                security.gamma = self.context.g(security.symbol, security.symbol, resolution=self.context.timeResolution)
-                security.vega = self.context.v(security.symbol, security.symbol, resolution=self.context.timeResolution)
-                security.rho = self.context.r(security.symbol, security.symbol, resolution=self.context.timeResolution)
-                security.theta = self.context.t(security.symbol, security.symbol, resolution=self.context.timeResolution)
+                security.iv = self.context.iv(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.delta = self.context.d(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.gamma = self.context.g(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.vega = self.context.v(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.rho = self.context.r(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.theta = self.context.t(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                
             except Exception as e:
-                self.context.logger.warning(f"FutureOption Initializer: Data not available: {e}") 
+                self.context.logger.warning(f"Security Initializer: Data not available: {e}") 
+
         elif security.Type in [SecurityType.Option, SecurityType.IndexOption]:
             # This is for options.
             security.SetFillModel(BetaFillModel(self.context))
