@@ -26,3 +26,9 @@ class Underlying:
 
     def Close(self):
         return self.Security().Close
+
+    def SecurityTradeBar(self):
+        last_data = self.Security().get_last_data()
+        if isinstance(last_data, QuoteBar):
+            return last_data.collapse()
+        return last_data
