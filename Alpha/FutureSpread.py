@@ -21,9 +21,9 @@ class FutureSpread(Base):
         # Minimum time distance between opening two consecutive trades
         "minimumTradeScheduleDistance": timedelta(minutes=10),
         # Days to Expiration
-        "dte": 50,  # Adjust this based on the futures contract you want to trade
+        "dte": 150,  # Adjust this based on the futures contract you want to trade
         # The size of the window used to filter the option chain: options expiring in the range [dte-dteWindow, dte] will be selected
-        "dteWindow": 50,
+        "dteWindow": 150,
         "useLimitOrders": True,
         "limitOrderRelativePriceAdjustment": 0.2,
         # Alternative method to set the absolute price (per contract) of the Limit Order. This method is used if a number is specified
