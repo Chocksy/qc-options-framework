@@ -10,3 +10,4 @@ from .CCModel import CCModel
 from .SPXButterfly import SPXButterfly
 from .SPXCondor import SPXCondor
 from .AssignmentModel import AssignmentModel
+from .FutureSpread import FutureSpread  # Add this line

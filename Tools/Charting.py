@@ -149,7 +149,7 @@ class Charting:
             # If symbol is defined then we print the symbol data on the chart
             if symbol is not None:
                 underlying = Underlying(self.context, symbol)
-                self.context.Plot("Trades", "UNDERLYING", underlying.Security().GetLastData())
+                self.context.Plot("Trades", "UNDERLYING", underlying.SecurityTradeBar())
 
         if plotInfo.totalSecurities:
             self.context.Plot("Total Securities", "Total Securities", self.context.Securities.Count)
