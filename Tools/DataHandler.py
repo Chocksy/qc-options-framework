@@ -139,12 +139,23 @@ class DataHandler:
         self.context.logger.debug(f"getOptionContracts -> maxDte: {maxDte}")
 
         if self.strategy.useSlice and slice is not None:
-            # Existing handling for equity options
-            for chain in slice.OptionChains:
-                if self.strategy.optionSymbol == None or chain.Key != self.strategy.optionSymbol:
-                    continue
-                if chain.Value.Contracts.Count != 0:
-                    contracts = list(chain.Value)
+            if self.is_future_option:
+                for continuous_future_symbol, futures_chain in slice.FuturesChains.items():
+                    if continuous_future_symbol == self.strategy.underlyingSymbol:
+                        for futures_contract in futures_chain:
+                            canonical_fop_symbol = Symbol.CreateCanonicalOption(futures_contract.Symbol)
+                            option_chain = slice.OptionChains.get(canonical_fop_symbol)
+                            if option_chain is not None and option_chain.contracts.count != 0:
+                                contracts = list(option_chain.Contracts.Values)
+                                break
+                        if contracts:
+                            break
+            else:
+                for chain in slice.OptionChains:
+                    if self.strategy.optionSymbol is None or chain.Key == self.strategy.optionSymbol:
+                        if chain.Value.Contracts.Count != 0:
+                            contracts = list(chain.Value)
+                            break
             self.context.logger.debug(f"getOptionContracts -> number of contracts from slice: {len(contracts) if contracts else 0}")
 
         if contracts is None:

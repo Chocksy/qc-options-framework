@@ -4,6 +4,10 @@ from AlgorithmImports import *
 
 from Tools import Logger, ContractUtils, BSM
 
+class LargeStrikeGapError(Exception):
+    """Custom exception for large gaps between option strikes."""
+    pass
+
 class OrderBuilder:
     """
     Manages the creation and retrieval of option contracts based on specified criteria to facilitate order construction.
@@ -458,35 +462,49 @@ class OrderBuilder:
 
         Args:
             contracts (list[OptionContract]): List of option contracts.
-            wingSize (float, optional): The distance from the ATM strike.
+            wingSize (float, optional): The maximum allowed distance between consecutive strikes.
 
         Returns:
             OptionContract: The wing contract, or None if not found.
+
+        Raises:
+            LargeStrikeGapError: If no pair of consecutive strikes has a difference less than or equal to wingSize.
         """
         # Make sure the wingSize is specified
         wingSize = wingSize or 0
 
+        if len(contracts) < 2 or wingSize <= 0:
+            return None
+
+        # Calculate differences between consecutive contracts
+        differences = [abs(contracts[i+1].Strike - contracts[i].Strike) for i in range(len(contracts)-1)]
+
+        # Check if any difference is less than or equal to wingSize
+        if not any(diff <= wingSize for diff in differences):
+            raise LargeStrikeGapError(
+                f"No consecutive strikes found within the specified wing size. "
+                f"SUGGESTION: Change your parameter wingSize in the model to {min(differences)}!"
+                f"Allowed wing size: {wingSize}, "
+                f"Minimum difference found: {min(differences)}"
+            )
+
         # Initialize output
         wingContract = None
+        firstLegStrike = contracts[0].Strike
+        currentWings = float('inf')
 
-        if len(contracts) > 1 and wingSize > 0:
-            # Get the short strike
-            firstLegStrike = contracts[0].Strike
-            # keep track of the wing size based on the long contract being selected
-            currentWings = 0
-            # Loop through all contracts
-            for contract in contracts[1:]:
-                # Select the long contract as long as it is within the specified wing size
-                if abs(contract.Strike - firstLegStrike) <= wingSize:
-                    currentWings = abs(contract.Strike - firstLegStrike)
-                    wingContract = contract
-                else:
-                    # We have exceeded the wing size, check if the distance to the requested wing size is closer than the contract previously selected
-                    if (abs(contract.Strike - firstLegStrike) - wingSize < wingSize - currentWings):
-                        wingContract = contract
-                    break
-            ### Loop through all contracts
-        ### if wingSize > 0
+        # Loop through contracts to find the best wing
+        for contract in contracts[1:]:
+            strike_difference = abs(contract.Strike - firstLegStrike)
+
+            if strike_difference <= wingSize:
+                wingContract = contract
+                currentWings = strike_difference
+            elif strike_difference - wingSize < currentWings - wingSize:
+                wingContract = contract
+                currentWings = strike_difference
+            else:
+                break  # We've gone too far, no need to continue
 
         return wingContract
 
@@ -507,6 +525,9 @@ class OrderBuilder:
 
         Returns:
             list[OptionContract]: The best spread contract, or None if not found.
+
+        Raises:
+            LargeStrikeGapError: If a large gap between strikes is detected.
         """
         # Type is a required parameter
         if type == None:
@@ -595,4 +616,3 @@ class OrderBuilder:
             List: A list of option contracts representing the Call spread, sorted based on specified criteria.
         """
         return self.getSpread(contracts, "Call", strike = strike, delta = delta, wingSize = wingSize, sortByStrike = sortByStrike)
-
