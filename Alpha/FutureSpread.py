@@ -42,15 +42,15 @@ class FutureSpread(Base):
         # Minimum premium accepted for opening a new position. Setting this to None disables it.
         "minPremium": 0.5,
         # Maximum premium accepted for opening a new position. Setting this to None disables it.
-        "maxPremium": 2.0,
+        "maxPremium": 20.0,
         # Profit Target Factor (Multiplier of the premium received/paid when the position was opened)
         "profitTarget": 1.0,
         "bidAskSpreadRatio": 0.4,
         "validateBidAskSpread": True,
         "marketCloseCutoffTime": time(15, 45, 0),
         # Put/Call Wing size for Iron Condor, Iron Fly
-        "putWingSize": 5,
-        "callWingSize": 5,
+        "putWingSize": 20,
+        "callWingSize": 20,
         # "targetPremium": 500,
     }
 
@@ -73,9 +73,7 @@ class FutureSpread(Base):
         # https://tradeautomationtoolbox.com/byob-ticks/?save=admZ4dG
         if data.ContainsKey(self.underlyingSymbol):
             self.logger.debug(f"FutureSpread -> getOrder: Data contains key {self.underlyingSymbol}")
-            # trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0)]
-            trade_times = [time(9, 45, 0), time(10, 15, 0), time(12, 30, 0), time(13, 0, 0), time(13, 30, 0), time(13, 45, 0), time(14, 0, 0)]
-            # trade_times = [time(hour, minute, 0) for hour in range(9, 15) for minute in range(0, 60, 30) if not (hour == 15 and minute > 0)]
+            trade_times = [time(9, 35, 0), time(9, 40, 0), time(9, 45, 0)]
             # Remove the microsecond from the current time
             current_time = self.context.Time.time().replace(microsecond=0)
             self.logger.debug(f"FutureSpread -> getOrder -> current_time: {current_time}")
@@ -84,14 +82,7 @@ class FutureSpread(Base):
             if current_time not in trade_times:
                 return None
 
-            put = self.order.getSpreadOrder(
-                chain,
-                'put',
-                fromPrice=self.minPremium,
-                toPrice=self.maxPremium,
-                wingSize=self.putWingSize,
-                sell=True
-            )
+            put = self.order.getSpreadOrder(chain,'put',fromPrice=self.minPremium,toPrice=self.maxPremium,wingSize=self.putWingSize,sell=True)
             self.logger.debug(f"SPXic -> getOrder: Put: {put}")
             if put is not None:
                 return [put]
