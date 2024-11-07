@@ -1,8 +1,12 @@
-import datetime
 from unittest.mock import MagicMock
-from datetime import datetime, timedelta
+import datetime as dt  # Import as dt to avoid naming conflicts
 from dataclasses import dataclass, field
 from typing import List, Union, Optional
+
+# Create datetime class with all needed components
+datetime = dt.datetime
+timedelta = dt.timedelta
+date = dt.date
 
 @dataclass
 class Insight:
@@ -109,9 +113,9 @@ class QCAlgorithm:
         self.StartDate = datetime.now() - timedelta(days=30)
         self.EndDate = datetime.now() + timedelta(days=30)
         self.logLevel = 0
-
-    def Log(self, message):
-        print(f"QC Log: {message}")
+        self.Resolution = Resolution
+        # Make Log a MagicMock instead of a regular function
+        self.Log = MagicMock()
 
     def GetLastKnownPrice(self, security):
         return MagicMock(Price=100.0)
@@ -215,6 +219,16 @@ class OptionContract:
     def __str__(self) -> str:
         return f"OptionContract({self.Symbol}, {self.Strike}, {self.Expiry}, {self.Right})"
 
+class OrderStatus:
+    """Mock of QuantConnect's OrderStatus enum"""
+    Invalid = "Invalid"
+    CancelPending = "CancelPending"
+    Canceled = "Canceled"
+    Filled = "Filled"
+    PartiallyFilled = "PartiallyFilled"
+    Submitted = "Submitted"
+    None_ = "None"
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -224,5 +238,9 @@ __all__ = [
     'QCAlgorithm',
     'Insight',
     'PortfolioTarget',
-    'OptionContract'
+    'OptionContract',
+    'datetime',
+    'timedelta',
+    'date',
+    'OrderStatus'
 ] 
