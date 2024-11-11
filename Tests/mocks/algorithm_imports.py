@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 import datetime as dt  # Import as dt to avoid naming conflicts
 from dataclasses import dataclass, field
 from typing import List, Union, Optional
+from datetime import time  # Add this import
 
 # Create datetime class with all needed components
 datetime = dt.datetime
@@ -114,11 +115,15 @@ class QCAlgorithm:
         self.EndDate = datetime.now() + timedelta(days=30)
         self.logLevel = 0
         self.Resolution = Resolution
-        # Make Log a MagicMock instead of a regular function
         self.Log = MagicMock()
+        self.Plot = MagicMock()
+        self.openPositions = MagicMock(Count=0)
 
     def GetLastKnownPrice(self, security):
         return MagicMock(Price=100.0)
+
+    def AddChart(self, chart):
+        pass
 
 class Greeks:
     """Mock of QuantConnect's Greeks class"""
@@ -229,6 +234,40 @@ class OrderStatus:
     Submitted = "Submitted"
     None_ = "None"
 
+class SeriesType:
+    Line = "Line"
+    Scatter = "Scatter"
+    Bar = "Bar"
+    Candlestick = "Candlestick"
+
+class Color:
+    Red = "Red"
+    Green = "Green"
+
+class ScatterMarkerSymbol:
+    Triangle = "Triangle"
+    TriangleDown = "TriangleDown"
+
+class Series:
+    def __init__(self, name, series_type, unit, color=None, symbol=None):
+        self.Name = name
+        self.SeriesType = series_type
+        self.Unit = unit
+        self.Color = color
+        self.Symbol = symbol
+
+class CandlestickSeries(Series):
+    def __init__(self, name, unit):
+        super().__init__(name, SeriesType.Candlestick, unit)
+
+class Chart:
+    def __init__(self, name):
+        self.Name = name
+        self.Series = []
+
+    def AddSeries(self, series):
+        self.Series.append(series)
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -242,5 +281,12 @@ __all__ = [
     'datetime',
     'timedelta',
     'date',
-    'OrderStatus'
+    'time',
+    'OrderStatus',
+    'SeriesType',
+    'Color',
+    'ScatterMarkerSymbol',
+    'Series',
+    'CandlestickSeries',
+    'Chart'
 ] 

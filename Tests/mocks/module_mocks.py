@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-from .algorithm_imports import Resolution
+from .algorithm_imports import Resolution, Chart, Series, SeriesType, Color, ScatterMarkerSymbol
 
 class ToolsModuleMock:
     """Mock for the Tools module and its submodules"""
@@ -8,7 +8,15 @@ class ToolsModuleMock:
         return {
             'Tools.Performance': MagicMock(),
             'Tools.DataHandler': MagicMock(),
-            'Tools': MagicMock(Resolution=Resolution)
+            'Tools.Charting': MagicMock(),
+            'Tools': MagicMock(
+                Resolution=Resolution,
+                Chart=Chart,
+                Series=Series,
+                SeriesType=SeriesType,
+                Color=Color,
+                ScatterMarkerSymbol=ScatterMarkerSymbol
+            )
         }
 
 class ModuleMocks:
