@@ -86,6 +86,7 @@ class Securities(dict):
             BidPrice=0.95,
             AskPrice=1.05,
             Price=100.0,
+            Close=100.0,
             IsTradable=True,
             symbol=MagicMock(
                 ID=MagicMock(
