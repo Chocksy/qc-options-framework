@@ -1,49 +1,32 @@
 from unittest.mock import MagicMock
-from .algorithm_imports import Resolution, Chart, Series, SeriesType, Color, ScatterMarkerSymbol
-
-class ToolsModuleMock:
-    """Mock for the Tools module and its submodules"""
-    @staticmethod
-    def create_mocks():
-        # Create ContractUtils mock
-        contract_utils_mock = MagicMock()
-        contract_utils_mock.ContractUtils = MagicMock
-        
-        # Create Underlying mock
-        underlying_mock = MagicMock()
-        underlying_mock.Underlying = MagicMock
-
-        # Create PositionsStore mock
-        positions_store_mock = MagicMock()
-        positions_store_mock.PositionsStore = MagicMock
-        
-        return {
-            'Tools.Performance': MagicMock(),
-            'Tools.DataHandler': MagicMock(),
-            'Tools.Charting': MagicMock(),
-            'Tools.ContractUtils': contract_utils_mock,
-            'Tools.Underlying': underlying_mock,
-            'Tools.Helper': MagicMock(),
-            'Tools.Logger': MagicMock(),
-            'Tools.PositionsStore': positions_store_mock,
-            'Tools': MagicMock(
-                Resolution=Resolution,
-                Chart=Chart,
-                Series=Series,
-                SeriesType=SeriesType,
-                Color=Color,
-                ScatterMarkerSymbol=ScatterMarkerSymbol,
-                ContractUtils=contract_utils_mock.ContractUtils,
-                Underlying=underlying_mock.Underlying,
-                PositionsStore=positions_store_mock.PositionsStore
-            )
-        }
+from .tools_mocks import ToolsModuleMock
+from .alpha_mocks import AlphaModuleMock
+from .initialization_mocks import InitializationModuleMock
 
 class ModuleMocks:
     """Collection of all module-level mocks"""
     @staticmethod
     def get_all():
-        return {
-            **ToolsModuleMock.create_mocks(),
-            # Add other module mocks here as needed
-        } 
+        # Create mock modules
+        tools_mocks = ToolsModuleMock.create_mocks()
+        alpha_mocks = AlphaModuleMock.create_mocks()
+        init_mocks = InitializationModuleMock.create_mocks()
+        
+        # Combine all mocks
+        all_mocks = {
+            **tools_mocks,
+            **alpha_mocks,
+            **init_mocks,
+        }
+        
+        # Create a mock for UnknownStrategy that has a proper string representation
+        strategy_mock = MagicMock()
+        strategy_mock.__str__ = lambda x: "UnknownStrategy"
+        strategy_mock.name = "UnknownStrategy"
+        
+        # Set up the UnknownStrategy mock
+        unknown_module = MagicMock()
+        unknown_module.UnknownStrategy = strategy_mock
+        all_mocks['Alpha.UnknownStrategy'] = unknown_module
+        
+        return all_mocks 

@@ -275,6 +275,20 @@ class Chart:
     def AddSeries(self, series):
         self.Series.append(series)
 
+class BuyingPowerModel:
+    """Mock of QuantConnect's BuyingPowerModel"""
+    def __init__(self):
+        pass
+
+    def GetMaximumOrderQuantityForTargetBuyingPower(self, *args, **kwargs):
+        return MagicMock(Quantity=100)
+
+    def GetLeverage(self, *args, **kwargs):
+        return 1.0
+
+    def GetReservedBuyingPowerForPosition(self, *args, **kwargs):
+        return 0.0
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -295,5 +309,6 @@ __all__ = [
     'ScatterMarkerSymbol',
     'Series',
     'CandlestickSeries',
-    'Chart'
+    'Chart',
+    'BuyingPowerModel'
 ] 
