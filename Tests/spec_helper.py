@@ -1,22 +1,27 @@
-from unittest.mock import patch
 import sys
+import numpy as np  # Import numpy once at the top level
+from unittest.mock import patch
 from .mocks.algorithm_imports import *
-from .mocks.algorithm_imports import __all__
 
 def patch_imports():
-    # Create algorithm imports mock
-    algorithm_mock = type('MockAlgorithmImports', (), {
-        name: globals()[name] 
-        for name in __all__
+    """
+    Creates a context for patching imports during tests
+    Returns a tuple of context managers for use in with statements
+    """
+    # Store the original numpy in sys.modules to prevent reloading
+    sys.modules['numpy'] = np
+    
+    mock_module = sys.modules[__name__]
+    
+    # Create the patch contexts
+    patch_context1 = patch.dict('sys.modules', {
+        'AlgorithmImports': mock_module,
+        'numpy': np
     })
     
-    # Create patches dictionary with globals
-    module_dict = {
-        'AlgorithmImports': algorithm_mock,
-        'Resolution': Resolution,  # Make Resolution available at module level
-    }
+    # We need to patch the module in the Tools package
+    patch_context2 = patch.dict('sys.modules', {
+        'Tools.AlgorithmImports': mock_module
+    })
     
-    return patch.dict('sys.modules', module_dict), patch.dict('builtins.__dict__', module_dict)
-
-def patch_algorithm_imports():
-    return patch_imports()
+    return patch_context1, patch_context2
