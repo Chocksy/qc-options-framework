@@ -8,8 +8,11 @@ export PIPENV_VERBOSITY=-1
 echo "Starting mamba tests..."
 pipenv run mamba Tests/specs --enable-coverage
 
-# Generate coverage report with source folders specified and Tests excluded
+# Generate coverage reports in both HTML and XML formats
 pipenv run coverage html \
   --include="Alpha/*,CustomIndicators/*,Data/*,Execution/*,Initialization/*,Monitor/*,Order/*,PortfolioConstruction/*,Strategy/*,Tools/*" \
-  --omit="Tests/*,*/__init__.py" \
-  # --fail-under=80
+  --omit="Tests/*,*/__init__.py"
+
+pipenv run coverage xml \
+  --include="Alpha/*,CustomIndicators/*,Data/*,Execution/*,Initialization/*,Monitor/*,Order/*,PortfolioConstruction/*,Strategy/*,Tools/*" \
+  --omit="Tests/*,*/__init__.py"

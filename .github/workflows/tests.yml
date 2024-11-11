@@ -26,27 +26,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install pipenv
 
-    - name: Cache pipenv virtualenv
-      uses: actions/cache@v3
-      with:
-        path: ~/.local/share/virtualenvs
-        key: ${{ runner.os }}-python-${{ matrix.python-version }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
-        
     - name: Install dependencies
       run: |
-        pipenv install --dev
+        pipenv install --dev --skip-lock
+        pipenv install coverage mamba --skip-lock
+        pipenv run pip list  # Debug: show installed packages
 
-    - name: Run tests with coverage
+    - name: Run tests
       run: |
-        export PYTHONPATH=$PYTHONPATH:$(pwd):$(pwd)/Tests
-        pipenv run mamba Tests/specs --enable-coverage
-
-    - name: Generate coverage report
-      if: always()
-      run: |
-        pipenv run coverage html
-        pipenv run coverage xml
-        pipenv run coverage report
+        chmod +x run_tests.sh
+        pipenv run ./run_tests.sh
 
     - name: Upload coverage reports to Codecov
       if: always()
