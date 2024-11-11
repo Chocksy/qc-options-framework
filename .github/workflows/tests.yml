@@ -34,7 +34,7 @@ jobs:
         
     - name: Install dependencies
       run: |
-        pipenv install
+        pipenv install --dev
 
     - name: Run tests with coverage
       run: |
