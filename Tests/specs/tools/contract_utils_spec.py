@@ -59,7 +59,8 @@ with description('ContractUtils') as self:
         with it('returns the expiry date of the contract'):
             with patch_imports()[0], patch_imports()[1]:
                 expiry = self.contract_utils.expiryDate(self.option_contract)
-                expect(expiry).to(equal(self.option_contract.Expiry))
+                # Compare the actual datetime values
+                expect(expiry).to(equal(self.option_contract._expiry))
 
     with context('volume'):
         with it('returns the trading volume'):

@@ -162,6 +162,7 @@ class OptionContract:
         self.symbol.ID.StrikePrice = self._strike
         self.symbol.ID.Date = self._expiry
         self.symbol.Value = "TEST"
+        self.symbol.Underlying = self._underlying_symbol
 
     # Properties with correct casing
     @property
@@ -221,6 +222,11 @@ class OptionContract:
     @property
     def UnderlyingLastPrice(self) -> float:
         return self._underlying_last_price
+
+    @property
+    def Underlying(self):
+        """Returns the underlying symbol - this matches the actual implementation"""
+        return self.symbol.Underlying
 
     def __str__(self) -> str:
         return f"OptionContract({self.Symbol}, {self.Strike}, {self.Expiry}, {self.Right})"
