@@ -74,9 +74,10 @@ class Symbol:
         mock.Value = symbol_str
         return mock
 
-    @staticmethod
-    def create_canonical_option(*args, **kwargs):
-        return MagicMock()
+    create_canonical_option = MagicMock()
+
+    def __init__(self):
+        pass
 
 class Securities(dict):
     """Mock of QuantConnect's Securities dictionary"""
@@ -119,6 +120,15 @@ class QCAlgorithm:
         self.Log = MagicMock()
         self.Plot = MagicMock()
         self.openPositions = MagicMock(Count=0)
+        self.timeResolution = Resolution.Minute
+        
+        # Add mocked methods for DataHandler tests
+        self.AddEquity = MagicMock()
+        self.AddIndex = MagicMock()
+        self.AddOption = MagicMock()
+        self.AddIndexOption = MagicMock()
+        self.AddOptionContract = MagicMock()
+        self.AddIndexOptionContract = MagicMock()
 
     def GetLastKnownPrice(self, security):
         return MagicMock(Price=100.0)
