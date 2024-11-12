@@ -35,7 +35,7 @@ jobs:
     - name: Run tests
       run: |
         chmod +x run_tests.sh
-        pipenv run ./run_tests.sh
+        CI=true pipenv run ./run_tests.sh
 
     - name: Upload coverage reports to Codecov
       if: always()
