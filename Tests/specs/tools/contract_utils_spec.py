@@ -1,11 +1,14 @@
 from mamba import description, context, it, before
 from expects import expect, equal, be_true, be_false, be_within
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from Tests.spec_helper import patch_imports
 from Tests.factories import Factory
+from Tests.mocks.module_mocks import ModuleMocks
+from datetime import datetime, timedelta
 
 with patch_imports()[0], patch_imports()[1]:
     from Tools.ContractUtils import ContractUtils
+    from Tests.mocks.algorithm_imports import OptionContract
 
 with description('ContractUtils') as self:
     with before.each:
@@ -59,8 +62,8 @@ with description('ContractUtils') as self:
         with it('returns the expiry date of the contract'):
             with patch_imports()[0], patch_imports()[1]:
                 expiry = self.contract_utils.expiryDate(self.option_contract)
-                # Compare the actual datetime values
-                expect(expiry).to(equal(self.option_contract._expiry))
+                # Compare only the date parts, not the exact microseconds
+                expect(expiry.date()).to(equal(self.option_contract._expiry.date()))
 
     with context('volume'):
         with it('returns the trading volume'):

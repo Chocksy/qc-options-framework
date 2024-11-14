@@ -61,8 +61,21 @@ class Resolution:
     Daily = "Daily"
 
 class OptionRight:
+    """Mock of QuantConnect's OptionRight enum"""
     Call = "Call"
     Put = "Put"
+    CALL = "Call"  # Add uppercase versions
+    PUT = "Put"    # Add uppercase versions
+
+    @staticmethod
+    def create(right_str):
+        """Helper method to create OptionRight from string"""
+        right_str = right_str.lower()
+        if right_str == "call":
+            return OptionRight.Call
+        elif right_str == "put":
+            return OptionRight.Put
+        return None
 
 class Market:
     USA = "USA"
@@ -74,10 +87,134 @@ class Symbol:
         mock.Value = symbol_str
         return mock
 
-    create_canonical_option = MagicMock()
+    @staticmethod
+    def create_option(underlying_symbol, market, option_style, right, strike_price, expiry_date):
+        """Mock implementation of create_option"""
+        mock = MagicMock()
+        mock.ID = MagicMock(
+            underlying=MagicMock(symbol=underlying_symbol),
+            market=market,
+            option_style=option_style,
+            option_right=right,
+            strike_price=strike_price,
+            date=expiry_date
+        )
+        mock.Value = f"{underlying_symbol}_{strike_price}_{right}_{expiry_date}"
+        return mock
+
+    @staticmethod
+    def create_canonical_option(underlying_symbol, target_option, market=None, alias=None):
+        """Mock implementation of create_canonical_option matching QC's implementation
+        
+        Args:
+            underlying_symbol: The underlying symbol
+            target_option: The target option ticker (e.g. SPXW)
+            market: The market (defaults to underlying's market)
+            alias: Optional alias for symbol cache
+        """
+        mock = MagicMock()
+        mock.ID = MagicMock(
+            underlying=MagicMock(symbol=underlying_symbol),
+            market=market or Market.USA,
+            option_style="European",  # Default for index options
+            date=None
+        )
+        mock.Value = f"{target_option}_CANONICAL_{market or Market.USA}"
+        mock.Underlying = underlying_symbol
+        return mock
 
     def __init__(self):
         pass
+
+    # Make create_canonical_option also available as a class attribute for testing
+    create_canonical_option = MagicMock(side_effect=create_canonical_option.__func__)
+
+class Security:
+    """Mock of QuantConnect's Security class"""
+    def __init__(self, symbol=None):
+        self.Symbol = symbol or Symbol.Create("TEST")
+        self.Type = SecurityType.Equity
+        self.Price = 100.0
+        self.BidPrice = 0.95
+        self.AskPrice = 1.05
+        self.Close = 100.0
+        self.IsTradable = True
+        self.HasData = True
+        self.Holdings = MagicMock(Quantity=0)
+        self.VolatilityModel = None
+        self.Expiry = datetime.now() + timedelta(days=30)
+        
+        # Greeks for options
+        self.delta = None
+        self.gamma = None
+        self.theta = None
+        self.vega = None
+        self.rho = None
+        self.iv = None
+
+    def SetDataNormalizationMode(self, mode):
+        pass
+
+    def SetMarketPrice(self, price):
+        self.Price = price
+
+    def SetBuyingPowerModel(self, model):
+        pass
+
+    def SetFillModel(self, model):
+        pass
+
+    def SetFeeModel(self, model):
+        pass
+
+    def SetOptionAssignmentModel(self, model):
+        pass
+
+    def PriceModel(self, model):
+        pass
+
+class SecurityType:
+    """Mock of QuantConnect's SecurityType enum"""
+    Equity = "Equity"
+    Option = "Option"
+    IndexOption = "IndexOption"
+    Index = "Index"
+
+class TradeBar:
+    """Mock of QuantConnect's TradeBar class"""
+    def __init__(self, time, symbol, open_price, high, low, close, volume):
+        self.Time = time
+        self.Symbol = symbol
+        self.Open = open_price
+        self.High = high
+        self.Low = low
+        self.Close = close
+        self.Volume = volume
+        self.Value = close  # Usually the closing price is used as the value
+        self.Period = timedelta(minutes=1)  # Default period
+
+    def Update(self, price, volume=0):
+        self.Close = price
+        self.Value = price
+        self.Volume += volume
+
+class DataNormalizationMode:
+    """Mock of QuantConnect's DataNormalizationMode enum"""
+    Raw = "Raw"
+    Adjusted = "Adjusted"
+    SplitAdjusted = "SplitAdjusted"
+    TotalReturn = "TotalReturn"
+
+class BrokerageName:
+    """Mock of QuantConnect's BrokerageName enum"""
+    InteractiveBrokersBrokerage = "InteractiveBrokersBrokerage"
+    TradierBrokerage = "TradierBrokerage"
+    OandaBrokerage = "OandaBrokerage"
+
+class AccountType:
+    """Mock of QuantConnect's AccountType enum"""
+    Margin = "Margin"
+    Cash = "Cash"
 
 class Securities(dict):
     """Mock of QuantConnect's Securities dictionary"""
@@ -89,6 +226,8 @@ class Securities(dict):
             Price=100.0,
             Close=100.0,
             IsTradable=True,
+            Volume=1000,
+            OpenInterest=100,
             symbol=MagicMock(
                 ID=MagicMock(
                     StrikePrice=100.0,
@@ -97,21 +236,43 @@ class Securities(dict):
                 Value="TEST"
             )
         )
+        # Configure the MagicMock to return actual values
+        type(self._default_security).Volume = property(lambda x: 1000)
+        type(self._default_security).OpenInterest = property(lambda x: 100)
+        
         # Pre-populate with TEST symbol
         self["TEST"] = self._default_security
     
+    def items(self):
+        """Return a list of items to allow safe iteration"""
+        return list(super().items())
+    
+    def clear(self):
+        """Clear all items including default security"""
+        super().clear()
+
     def __getitem__(self, key):
-        # Handle both Symbol objects and strings
         if hasattr(key, 'Value'):
             key = key.Value
-        if key not in self:
-            self[key] = self._default_security
         return super().__getitem__(key)
+
+    def __delitem__(self, key):
+        if hasattr(key, 'Value'):
+            key = key.Value
+        if key in self:
+            super().__delitem__(key)
+
+    def __contains__(self, key):
+        if hasattr(key, 'Value'):
+            key = key.Value
+        return super().__contains__(key)
 
 class QCAlgorithm:
     def __init__(self):
         self.Securities = Securities()
-        self.Portfolio = {}
+        self.Portfolio = MagicMock(
+            SetPositions=MagicMock()
+        )
         self.Time = datetime.now()
         self.StartDate = datetime.now() - timedelta(days=30)
         self.EndDate = datetime.now() + timedelta(days=30)
@@ -121,6 +282,13 @@ class QCAlgorithm:
         self.Plot = MagicMock()
         self.openPositions = MagicMock(Count=0)
         self.timeResolution = Resolution.Minute
+        self.optionContractsSubscriptions = []
+        
+        # Add missing attributes
+        self.universe_settings = MagicMock(resolution=None)
+        self.LiveMode = False
+        self.strategies = []
+        self._benchmark = None  # Add private benchmark variable
         
         # Add mocked methods for DataHandler tests
         self.AddEquity = MagicMock()
@@ -129,12 +297,45 @@ class QCAlgorithm:
         self.AddIndexOption = MagicMock()
         self.AddOptionContract = MagicMock()
         self.AddIndexOptionContract = MagicMock()
+        self.SetBrokerageModel = MagicMock()
+        self.RemoveSecurity = MagicMock()
+        
+        # Add new attributes
+        self.charting = MagicMock(updateStats=MagicMock())
+        self.TradingCalendar = MagicMock()
+        
+        # Add new methods as MagicMocks
+        self.SetBenchmark = MagicMock()
+
+    @property
+    def Benchmark(self):
+        """Mock implementation of Benchmark property"""
+        return self._benchmark
+
+    def SetBenchmark(self, symbol):
+        """Mock implementation of SetBenchmark"""
+        self._benchmark = symbol
+
+    def lastTradingDay(self, expiry):
+        """Mock implementation of lastTradingDay"""
+        if isinstance(expiry, datetime):
+            return expiry.date()
+        return expiry
 
     def GetLastKnownPrice(self, security):
         return MagicMock(Price=100.0)
 
     def AddChart(self, chart):
         pass
+
+    def SetBrokerageModel(self, brokerage_name, account_type):
+        """Mock implementation of SetBrokerageModel"""
+        pass
+
+    def RemoveSecurity(self, symbol):
+        """Mock implementation of RemoveSecurity"""
+        if symbol in self.Securities:
+            del self.Securities[symbol]
 
 class Greeks:
     """Mock of QuantConnect's Greeks class"""
@@ -206,7 +407,7 @@ class OptionContract:
         return self._time
 
     @property
-    def OpenInterest(self) -> float:
+    def OpenInterest(self) -> int:
         return self._open_interest
 
     @property
@@ -287,6 +488,8 @@ class Chart:
 
 class BuyingPowerModel:
     """Mock of QuantConnect's BuyingPowerModel"""
+    NULL = None
+    
     def __init__(self):
         pass
 
@@ -299,12 +502,67 @@ class BuyingPowerModel:
     def GetReservedBuyingPowerForPosition(self, *args, **kwargs):
         return 0.0
 
+class ImmediateFillModel:
+    """Mock of QuantConnect's ImmediateFillModel"""
+    def __init__(self):
+        pass
+
+    def MarketFill(self, order, security):
+        return MagicMock(
+            OrderEvent=MagicMock(
+                OrderId=order.Id,
+                Symbol=order.Symbol,
+                Status=OrderStatus.Filled,
+                FillPrice=security.Price,
+                FillQuantity=order.Quantity
+            )
+        )
+
+    def StopMarketFill(self, order, security):
+        return self.MarketFill(order, security)
+
+    def StopLimitFill(self, order, security):
+        return self.MarketFill(order, security)
+
+    def LimitFill(self, order, security):
+        return self.MarketFill(order, security)
+
+    def MarketOnCloseFill(self, order, security):
+        return self.MarketFill(order, security)
+
+    def MarketOnOpenFill(self, order, security):
+        return self.MarketFill(order, security)
+
+class SecurityPositionGroupModel:
+    """Mock of QuantConnect's SecurityPositionGroupModel"""
+    Null = None
+
+class OptionPriceModels:
+    """Mock of QuantConnect's OptionPriceModels"""
+    @staticmethod
+    def CrankNicolsonFD():
+        return MagicMock()
+
+class StandardDeviationOfReturnsVolatilityModel:
+    """Mock of QuantConnect's StandardDeviationOfReturnsVolatilityModel"""
+    def __init__(self, periods):
+        self.periods = periods
+
+    def Update(self, security, trade_bar):
+        pass
+
 # Export all the mocks
 __all__ = [
     'Resolution',
     'OptionRight',
     'Market',
     'Symbol',
+    'Security',
+    'SecurityType',
+    'TradeBar',
+    'DataNormalizationMode',
+    'BrokerageName',
+    'AccountType',
     'QCAlgorithm',
     'Insight',
     'PortfolioTarget',
@@ -320,5 +578,9 @@ __all__ = [
     'Series',
     'CandlestickSeries',
     'Chart',
-    'BuyingPowerModel'
+    'BuyingPowerModel',
+    'ImmediateFillModel',
+    'SecurityPositionGroupModel',
+    'OptionPriceModels',
+    'StandardDeviationOfReturnsVolatilityModel'
 ] 

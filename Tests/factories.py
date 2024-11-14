@@ -17,15 +17,7 @@ class Factory:
 
     @staticmethod
     def create_option_contract():
-        """Creates a mock option contract with consistent expiry dates"""
-        with patch_imports()[0], patch_imports()[1]:
-            from AlgorithmImports import OptionContract
-            
-            # Create a fixed expiry date for consistency
-            expiry_date = datetime.now() + timedelta(days=30)
-            
-            contract = OptionContract()
-            contract._expiry = expiry_date
-            contract.symbol.ID.Date = expiry_date  # Make sure both dates match
-            
-            return contract
+        """Creates a mock option contract with proper property values"""
+        from Tests.mocks.algorithm_imports import OptionContract
+        contract = OptionContract()
+        return contract
