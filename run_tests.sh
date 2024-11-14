@@ -6,7 +6,11 @@ export PIPENV_VERBOSITY=-1
 
 # Run mamba tests
 echo "Starting mamba tests..."
-pipenv run mamba Tests/specs --enable-coverage
+if [ "$CI" = "true" ]; then
+  pipenv run mamba Tests/specs --enable-coverage --format=junit > junit.xml
+else
+  pipenv run mamba Tests/specs --enable-coverage
+fi
 
 # Generate coverage reports in HTML format
 pipenv run coverage html \
