@@ -381,6 +381,7 @@ class OptionContract:
         self._ask_size = 10
         self._underlying_last_price = 100.0
         self._underlying_symbol = "TEST"
+        self._bsm_greeks = None  # Add BSM Greeks storage
         
         # Add symbol property structure
         self.symbol = MagicMock()
@@ -389,6 +390,20 @@ class OptionContract:
         self.symbol.ID.Date = self._expiry
         self.symbol.Value = "TEST"
         self.symbol.Underlying = self._underlying_symbol
+
+    @property
+    def BSMGreeks(self):
+        """Mock BSMGreeks property that persists"""
+        if self._bsm_greeks is None:
+            # Create a mock with Delta property that returns the stored delta
+            self._bsm_greeks = MagicMock()
+            self._bsm_greeks.Delta = self._greeks.delta
+        return self._bsm_greeks
+
+    @BSMGreeks.setter
+    def BSMGreeks(self, value):
+        """Allow setting BSMGreeks directly"""
+        self._bsm_greeks = value
 
     # Properties with correct casing
     @property
