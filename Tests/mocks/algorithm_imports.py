@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 from typing import List, Union, Optional
 from datetime import time  # Add this import
 
+# At the top of the file, add List to be exported
+List = List  # This makes List available for import from our mock
+
 # Create datetime class with all needed components
 datetime = dt.datetime
 timedelta = dt.timedelta
@@ -581,6 +584,59 @@ class StandardDeviationOfReturnsVolatilityModel:
     def Update(self, security, trade_bar):
         pass
 
+class RiskManagementModel:
+    """Mock of QuantConnect's RiskManagementModel class"""
+    def __init__(self):
+        pass
+
+    def ManageRisk(self, algorithm: 'QCAlgorithm', targets: List['PortfolioTarget']) -> List['PortfolioTarget']:
+        return targets
+
+    def OnSecuritiesChanged(self, algorithm: 'QCAlgorithm', changes: 'SecurityChanges') -> None:
+        pass
+
+class SecurityChanges:
+    """Mock of QuantConnect's SecurityChanges class"""
+    def __init__(self, added_securities=None, removed_securities=None):
+        self.AddedSecurities = added_securities or []
+        self.RemovedSecurities = removed_securities or []
+
+# Add this class with the other mock classes:
+
+class PythonIndicator:
+    """Mock of QuantConnect's PythonIndicator class"""
+    def __init__(self, name):
+        self.Name = name
+        self.Current = MagicMock()
+        self.IsReady = False
+        self.WarmUpPeriod = 0
+
+    def Update(self, input):
+        pass
+
+    def Reset(self):
+        pass
+
+    def BullLevels(self):
+        return [100.0, 101.0, 102.0]  # Mock values
+
+    def BearLevels(self):
+        return [98.0, 97.0, 96.0]  # Mock values
+
+# Add this class with other mock classes:
+
+class SecuritiesDict(dict):
+    """Mock of QuantConnect's Securities dictionary with special lookup behavior"""
+    def ContainsKey(self, key):
+        return str(key) in self
+        
+    def __getitem__(self, key):
+        key_str = str(key)
+        for k, v in self.items():
+            if str(k) == key_str:
+                return v
+        return super().__getitem__(key)
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -613,5 +669,10 @@ __all__ = [
     'ImmediateFillModel',
     'SecurityPositionGroupModel',
     'OptionPriceModels',
-    'StandardDeviationOfReturnsVolatilityModel'
+    'StandardDeviationOfReturnsVolatilityModel',
+    'RiskManagementModel',
+    'List',
+    'SecurityChanges',
+    'PythonIndicator',
+    'SecuritiesDict'
 ] 
