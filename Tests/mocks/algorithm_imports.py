@@ -21,6 +21,21 @@ class Insight:
     SourceModel: str = "MockModel"
     Weight: float = 0.0
 
+    @staticmethod
+    def Price(symbol, period, direction):
+        """Mock implementation of static Price method"""
+        return Insight(
+            Symbol=symbol,
+            Period=period,
+            Direction=direction
+        )
+
+class InsightDirection:
+    """Mock of QuantConnect's InsightDirection enum"""
+    Up = "Up"
+    Down = "Down"
+    Flat = "Flat"
+
 @dataclass
 class PortfolioTarget:
     """Mock of QuantConnect's PortfolioTarget class"""
@@ -565,6 +580,7 @@ __all__ = [
     'AccountType',
     'QCAlgorithm',
     'Insight',
+    'InsightDirection',
     'PortfolioTarget',
     'OptionContract',
     'datetime',
