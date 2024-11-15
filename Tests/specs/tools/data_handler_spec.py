@@ -4,18 +4,10 @@ from unittest.mock import patch, MagicMock, call
 from Tests.spec_helper import patch_imports
 from Tests.factories import Factory
 from Tests.mocks.module_mocks import ModuleMocks
-from Tests.mocks.algorithm_imports import Resolution, Symbol, Market
+from Tests.mocks.algorithm_imports import (
+    SecurityType, Resolution, Symbol, Market, SecuritiesDict
+)
 from datetime import timedelta, datetime
-
-# Create a custom Securities dictionary that can handle symbol lookups
-class SecuritiesDict(dict):
-    def __getitem__(self, key):
-        # Convert key to string for comparison
-        key_str = str(key)
-        for k, v in self.items():
-            if str(k) == key_str:
-                return v
-        return super().__getitem__(key)
 
 # First patch all imports using our centralized mock structure
 patch_contexts = patch_imports()
