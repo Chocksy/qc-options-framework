@@ -708,6 +708,45 @@ class PythonData:
         """Mock implementation of DefaultResolution"""
         return Resolution.Minute
 
+# Add this class with the other mock classes:
+
+class ExecutionModel:
+    """Mock of QuantConnect's ExecutionModel base class"""
+    def __init__(self):
+        pass
+
+    def Execute(self, algorithm, targets):
+        """Mock implementation of Execute method"""
+        pass
+
+    def OnSecuritiesChanged(self, algorithm, changes):
+        """Mock implementation of OnSecuritiesChanged method"""
+        pass
+
+# Add this class with the other mock classes:
+
+class PortfolioTargetCollection:
+    """Mock of QuantConnect's PortfolioTargetCollection class"""
+    def __init__(self):
+        self._targets = []
+        self.IsEmpty = True
+
+    def AddRange(self, targets):
+        """Mock implementation of AddRange"""
+        if targets:
+            self._targets.extend(targets)
+            self.IsEmpty = len(self._targets) == 0
+
+    def ClearFulfilled(self, algorithm):
+        """Mock implementation of ClearFulfilled"""
+        pass
+
+    def __iter__(self):
+        return iter(self._targets)
+
+    def __len__(self):
+        return len(self._targets)
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -748,5 +787,7 @@ __all__ = [
     'SecuritiesDict',
     'AlphaModel',
     'Slice',
-    'PythonData'
+    'PythonData',
+    'ExecutionModel',
+    'PortfolioTargetCollection'
 ] 
