@@ -25,7 +25,7 @@ class Scanner:
         # Set the logger
         self.logger = Logger(context, className = type(self).__name__, logLevel = context.logLevel)
 
-    def Call(self, data) -> [Dict, str]:
+    def Call(self, data):
         """
         Processes incoming data to scan and filter option contracts. It checks market status, scheduled trading times, and position limits before proceeding with filtering.
 
