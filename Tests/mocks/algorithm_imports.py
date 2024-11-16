@@ -33,6 +33,11 @@ class Insight:
             Direction=direction
         )
 
+    @staticmethod
+    def Group(insights):
+        """Mock implementation of static Group method"""
+        return insights if insights else []
+
 class InsightDirection:
     """Mock of QuantConnect's InsightDirection enum"""
     Up = "Up"
@@ -637,6 +642,72 @@ class SecuritiesDict(dict):
                 return v
         return super().__getitem__(key)
 
+# Add this class with the other mock classes:
+
+class AlphaModel:
+    """Mock of QuantConnect's AlphaModel base class"""
+    def __init__(self):
+        pass
+
+    def Update(self, algorithm, data):
+        """Mock implementation of Update method"""
+        return []
+
+    def OnSecuritiesChanged(self, algorithm, changes):
+        """Mock implementation of OnSecuritiesChanged method"""
+        pass
+
+# Add this class with the other mock classes:
+
+class Slice:
+    """Mock of QuantConnect's Slice class"""
+    def __init__(self):
+        self.OptionChains = {}
+        self.Bars = {}
+        self.QuoteBars = {}
+        self.Ticks = {}
+        self.CustomData = {}
+        self.Time = datetime.now()
+        self.HasData = True
+        self.ContainsKey = MagicMock(return_value=True)
+
+    def __getitem__(self, key):
+        """Allow dictionary-style access to data"""
+        if key in self.Bars:
+            return self.Bars[key]
+        if key in self.OptionChains:
+            return self.OptionChains[key]
+        if key in self.QuoteBars:
+            return self.QuoteBars[key]
+        if key in self.Ticks:
+            return self.Ticks[key]
+        return None
+
+    def ContainsKey(self, key):
+        """Mock implementation of ContainsKey"""
+        return key in self.Bars or key in self.OptionChains or key in self.QuoteBars or key in self.Ticks
+
+class PythonData:
+    """Mock of QuantConnect's PythonData base class"""
+    def __init__(self):
+        self.Symbol = None
+        self.Time = datetime.now()
+        self.Value = 0.0
+        self.Price = 0.0
+        self.EndTime = datetime.now()
+
+    def GetSource(self, config, date, isLiveMode):
+        """Mock implementation of GetSource"""
+        return None, False
+
+    def Reader(self, config, line, date, isLiveMode):
+        """Mock implementation of Reader"""
+        return None
+
+    def DefaultResolution(self):
+        """Mock implementation of DefaultResolution"""
+        return Resolution.Minute
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -674,5 +745,8 @@ __all__ = [
     'List',
     'SecurityChanges',
     'PythonIndicator',
-    'SecuritiesDict'
+    'SecuritiesDict',
+    'AlphaModel',
+    'Slice',
+    'PythonData'
 ] 
