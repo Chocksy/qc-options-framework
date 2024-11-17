@@ -109,10 +109,13 @@ with description('SetupBaseStructure') as self:
 
     with context('checkOpenPositions'):
         with before.each:
+            # Set current time on algorithm
+            self.algorithm.Time = datetime.now()
+            
             # Create a mock expired security
             expired_security = MagicMock(
                 Type=SecurityType.Option,
-                Symbol=MagicMock(Value='opt1'),  # Make sure Symbol has Value attribute
+                Symbol=MagicMock(Value='opt1'),
                 HasData=True,
                 Expiry=datetime.now() - timedelta(days=1)
             )
@@ -136,6 +139,36 @@ with description('SetupBaseStructure') as self:
             self.algorithm.workingOrders = {}
             self.algorithm.optionContractsSubscriptions = []  # Add this line
             
+            # Add working orders setup with concrete datetime values
+            current_time = datetime.now()
+            self.mock_order = MagicMock(
+                orderId='order1',
+                orderType='open',
+                limitOrderExpiryDttm=current_time + timedelta(minutes=5)
+            )
+            
+            # Add position setup with concrete datetime values
+            self.mock_position = MagicMock(
+                orderTag='tag1',
+                orderId='order1',
+                legs=[MagicMock(expiry=current_time + timedelta(minutes=5))],
+                cancelOrder=MagicMock()
+            )
+            
+            # Configure position to return openOrder with concrete datetime
+            mock_order = MagicMock(
+                limitOrderExpiryDttm=current_time + timedelta(minutes=5)
+            )
+            self.mock_position.__getitem__.return_value = mock_order
+            
+            # Add to algorithm
+            self.algorithm.workingOrders = {'tag1': self.mock_order}
+            self.algorithm.allPositions = {'order1': self.mock_position}
+            self.algorithm.openPositions = {'tag1': 'order1'}
+            
+            # Set includeCancelledOrders flag
+            self.algorithm.includeCancelledOrders = True
+
         with it('removes expired securities'):
             # Create a copy of the securities before checking positions
             initial_securities_count = len(self.algorithm.Securities)
@@ -148,15 +181,98 @@ with description('SetupBaseStructure') as self:
 
         with it('handles expired positions'):
             position = MagicMock()
+            current_time = datetime.now()
             position.legs = [
-                MagicMock(expiry=datetime.now() - timedelta(days=1))
+                MagicMock(expiry=current_time - timedelta(days=1))
             ]
+            # Configure position's order with concrete datetime
+            mock_order = MagicMock(limitOrderExpiryDttm=current_time - timedelta(minutes=1))
+            position.__getitem__ = MagicMock(return_value=mock_order)
+            
             self.algorithm.allPositions = {'order1': position}
             self.algorithm.openPositions = {'tag1': 'order1'}
             
             self.setup.checkOpenPositions()
             
             expect(self.algorithm.openPositions).to(equal({}))
+
+        with it('removes expired working orders due to time limit'):
+            # Set order expiry to past time using concrete datetime
+            current_time = datetime.now()
+            self.mock_order.limitOrderExpiryDttm = current_time - timedelta(minutes=1)
+            
+            # Configure position's order with same expired datetime
+            mock_expired_order = MagicMock(
+                limitOrderExpiryDttm=current_time - timedelta(minutes=1)
+            )
+            self.mock_position.__getitem__.return_value = mock_expired_order
+            
+            self.setup.checkOpenPositions()
+            
+            expect(self.algorithm.workingOrders).to(equal({}))
+            expect(self.mock_position.cancelOrder.called).to(be_true)
+            expect('order1' in self.algorithm.allPositions).to(be_true)
+
+        with it('removes expired working orders due to leg expiry'):
+            # Set leg expiry to past time using concrete datetime
+            current_time = datetime.now()
+            self.mock_position.legs[0].expiry = current_time - timedelta(minutes=1)
+            
+            self.setup.checkOpenPositions()
+            
+            expect(self.algorithm.workingOrders).to(equal({}))
+            expect(self.mock_position.cancelOrder.called).to(be_true)  # Using .called instead of call_count
+
+        with it('removes cancelled positions when includeCancelledOrders is False'):
+            self.algorithm.includeCancelledOrders = False
+            
+            # Set order expiry to past time
+            self.mock_order.limitOrderExpiryDttm = datetime.now() - timedelta(minutes=1)
+            
+            # Configure position to return expired order for the specific order type
+            mock_expired_order = MagicMock(
+                limitOrderExpiryDttm=datetime.now() - timedelta(minutes=1)
+            )
+            def get_order(key):
+                if key == 'openOrder':  # Match the orderType from mock_order
+                    return mock_expired_order
+                return MagicMock()
+            self.mock_position.__getitem__.side_effect = get_order
+            
+            self.setup.checkOpenPositions()
+            
+            expect('order1' in self.algorithm.allPositions).to(be_false)
+            expect(self.algorithm.workingOrders).to(equal({}))
+            expect(self.algorithm.openPositions).to(equal({}))
+
+        with it('keeps cancelled positions when includeCancelledOrders is True'):
+            self.algorithm.includeCancelledOrders = True
+            
+            # Set order expiry to past time
+            self.mock_order.limitOrderExpiryDttm = datetime.now() - timedelta(minutes=1)
+            
+            # Configure position to return expired order for the specific order type
+            mock_expired_order = MagicMock(
+                limitOrderExpiryDttm=datetime.now() - timedelta(minutes=1)
+            )
+            def get_order(key):
+                if key == 'openOrder':  # Match the orderType from mock_order
+                    return mock_expired_order
+                return MagicMock()
+            self.mock_position.__getitem__.side_effect = get_order
+            
+            self.setup.checkOpenPositions()
+            
+            expect('order1' in self.algorithm.allPositions).to(be_true)
+            expect(self.algorithm.workingOrders).to(equal({}))
+            expect(self.algorithm.openPositions).to(equal({}))
+
+        with it('updates charting stats when removing expired positions'):
+            self.mock_position.legs[0].expiry = datetime.now() - timedelta(minutes=1)
+            
+            self.setup.checkOpenPositions()
+            
+            self.algorithm.charting.updateStats.assert_called_with(self.mock_position)
 
     with context('AddConfiguration'):
         with it('adds configuration parameters correctly'):
