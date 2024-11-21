@@ -472,3 +472,36 @@ with description('OrderBuilder') as self:
             # For min premium, expect the spread with smallest price difference
             expect(result[0].Strike).to(equal(100.0))  # Lower premium leg
             expect(result[1].Strike).to(equal(110.0))  # Higher premium leg
+
+    with context('getATMStrike'):
+        with before.each:
+            # Create mock contracts at different strikes
+            self.atm_contracts = []
+            for strike in [95, 100, 105]:
+                contract = OptionContract()
+                contract._strike = strike
+                contract._right = OptionRight.Call
+                contract._bid_price = strike - 0.05
+                contract._ask_price = strike + 0.05
+                self.atm_contracts.append(contract)
+                
+            # Mock underlying price to 100 for ATM tests
+            self.builder.contractUtils.getUnderlyingLastPrice = MagicMock(return_value=100.0)
+
+        with it('returns correct ATM strike when contracts exist'):
+            result = self.builder.getATMStrike(self.atm_contracts)
+            expect(result).to(equal(100.0))  # Should return strike closest to underlying price
+
+        with it('returns None when no contracts exist'):
+            result = self.builder.getATMStrike([])
+            expect(result).to(be_none)
+
+        with it('handles mixed put and call contracts'):
+            # Add a put contract at ATM strike
+            put_contract = OptionContract()
+            put_contract._strike = 100.0
+            put_contract._right = OptionRight.Put
+            self.atm_contracts.append(put_contract)
+            
+            result = self.builder.getATMStrike(self.atm_contracts)
+            expect(result).to(equal(100.0))  # Should still return ATM strike

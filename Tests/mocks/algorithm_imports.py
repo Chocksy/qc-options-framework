@@ -327,17 +327,17 @@ class QCAlgorithm:
         self.charting = MagicMock(updateStats=MagicMock())
         self.TradingCalendar = MagicMock()
         
-        # Add new methods as MagicMocks
+        # Add market order methods
+        self.MarketOrder = MagicMock()
+        self.ComboMarketOrder = MagicMock(return_value=[MagicMock(OrderId="123")])
+        
+        # Make SetBenchmark a MagicMock instead of a method
         self.SetBenchmark = MagicMock()
 
     @property
     def Benchmark(self):
         """Mock implementation of Benchmark property"""
         return self._benchmark
-
-    def SetBenchmark(self, symbol):
-        """Mock implementation of SetBenchmark"""
-        self._benchmark = symbol
 
     def lastTradingDay(self, expiry):
         """Mock implementation of lastTradingDay"""
@@ -747,6 +747,18 @@ class PortfolioTargetCollection:
     def __len__(self):
         return len(self._targets)
 
+# Add this class with the other mock classes:
+class Leg:
+    """Mock of QuantConnect's Leg class"""
+    def __init__(self, symbol=None, ratio=1):
+        self.Symbol = symbol
+        self.Ratio = ratio
+
+    @staticmethod
+    def Create(symbol, ratio=1):
+        """Mock implementation of Create method"""
+        return Leg(symbol, ratio)
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -789,5 +801,6 @@ __all__ = [
     'Slice',
     'PythonData',
     'ExecutionModel',
-    'PortfolioTargetCollection'
+    'PortfolioTargetCollection',
+    'Leg'
 ] 

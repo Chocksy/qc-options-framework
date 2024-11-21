@@ -79,6 +79,7 @@ with description('Alpha.Utils.Scanner') as self:
 
     with context('isWithinScheduledTimeWindow'):
         with before.each:
+            # Set schedule window
             self.base.scheduleStartTime = time(9, 30)
             self.base.scheduleStopTime = time(16, 0)
             self.base.scheduleFrequency = timedelta(minutes=5)
@@ -92,7 +93,12 @@ with description('Alpha.Utils.Scanner') as self:
             expect(self.scanner.isWithinScheduledTimeWindow()).to(be_false)
             
         with it('returns True at correct schedule interval'):
-            self.algorithm.Time = datetime.now().replace(hour=10, minute=0)
+            # Set time to exactly 10:00 AM which is divisible by 5-minute frequency
+            current_time = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
+            self.algorithm.Time = current_time
+            # Ensure the time difference is exactly divisible by schedule frequency
+            time_diff = current_time - current_time.replace(hour=9, minute=30)
+            expect(time_diff.total_seconds() % self.base.scheduleFrequency.total_seconds()).to(equal(0))
             expect(self.scanner.isWithinScheduledTimeWindow()).to(be_true)
             
         with it('returns False between schedule intervals'):
