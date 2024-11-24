@@ -759,6 +759,18 @@ class Leg:
         """Mock implementation of Create method"""
         return Leg(symbol, ratio)
 
+# Add this class with the other mock classes:
+class UpdateOrderFields:
+    """Mock of QuantConnect's UpdateOrderFields class"""
+    def __init__(self):
+        self.LimitPrice = None
+        self.StopPrice = None
+        self.Quantity = None
+        self.Tag = None
+
+    def __str__(self):
+        return f"UpdateOrderFields(LimitPrice={self.LimitPrice}, StopPrice={self.StopPrice}, Quantity={self.Quantity}, Tag={self.Tag})"
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -802,5 +814,6 @@ __all__ = [
     'PythonData',
     'ExecutionModel',
     'PortfolioTargetCollection',
-    'Leg'
+    'Leg',
+    'UpdateOrderFields'
 ] 
