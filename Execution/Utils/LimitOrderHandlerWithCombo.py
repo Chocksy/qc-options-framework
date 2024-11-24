@@ -153,7 +153,7 @@ class LimitOrderHandlerWithCombo:
 
         # Get the first order ticket (we only need to update one for the combo order)
         ticket = context.Transactions.GetOrderTicket(orderTransactionIds[0])
-        
+
         if ticket and ticket.Status != OrderStatus.Filled:
             update_settings = UpdateOrderFields()
             update_settings.LimitPrice = newLimitPrice
@@ -323,26 +323,16 @@ class LimitOrderHandlerWithCombo:
 
     def calculateAdjustmentValueSold(self, execOrder, limitOrderPrice, retries=0, nrContracts=1):
         """
-        Calculates an adjustment value for a sold order based on its current execution details, limit order price, retry count, and contract number.
-        This value is used to modify the limit price in an attempt to optimize the order's market execution potential.
-
-        Args:
-            execOrder (ExecutionOrder): The current execution order details.
-            limitOrderPrice (float): The original limit price set for the order.
-            retries (int): The number of times the order has been retried.
-            nrContracts (int): The number of contracts involved in the order.
-
-        Returns:
-            float: The adjustment value to be applied to the order's limit price.
+        Calculates an adjustment value for a sold order based on its current execution details.
         """
         if self.base.orderAdjustmentPct is None and self.base.adjustmentIncrement is None:
             raise ValueError("orderAdjustmentPct or adjustmentIncrement must be set in the parameters")
 
         # Adjust the limitOrderPrice
-        limitOrderPrice += self.base.orderAdjustmentPct * limitOrderPrice # Increase the price by orderAdjustmentPct
+        limitOrderPrice += self.base.orderAdjustmentPct * limitOrderPrice 
 
-        min_price = self.base.minPricePct * limitOrderPrice # Minimum allowed price is % of limitOrderPrice
-
+        min_price = self.base.minPricePct * limitOrderPrice 
+    
         # Calculate the range and step
         if self.base.adjustmentIncrement is None:
             # Calculate the step based on the bidAskSpread and the number of retries

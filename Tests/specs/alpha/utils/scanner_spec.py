@@ -300,9 +300,18 @@ with description('Alpha.Utils.Scanner') as self:
             self.base.parameter = MagicMock(return_value=None)
             
         with it('respects minimum trade schedule distance'):
-            self.base.parameter = MagicMock(return_value=timedelta(hours=1))
+            # Mock the parameter method to return a timedelta
+            self.base.parameter = MagicMock(side_effect=lambda key, default=None: 
+                timedelta(hours=1) if key == 'minimumTradeScheduleDistance' else None
+            )
+            
+            # Set lastOpenedDttm to be within the minimum distance
             self.algorithm.lastOpenedDttm = datetime.now() - timedelta(minutes=30)
+            
+            # Call Filter
             result, tag = self.scanner.Filter(self.chain)
+            
+            # Both result and tag should be None when minimum distance isn't met
             expect(result).to(be_none)
             expect(tag).to(be_none)
             
