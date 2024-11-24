@@ -27,8 +27,10 @@ expects = "*"
 pytest = "*"
 mock = "*"
 scipy = "*"
+decorator = "*"
 
 [dev-packages]
+ipdb = "*"
 
 [requires]
 python_version = "3.8"
