@@ -15,41 +15,36 @@ class Base(PortfolioConstructionModel):
     def CreateTargets(self, algorithm: QCAlgorithm, insights: List[Insight]) -> List[PortfolioTarget]:
         # super().CreateTargets(algorithm, insights)
         targets = []
+        if not insights:
+            return targets
+
         for insight in insights:
+            # Skip invalid insights
+            if insight is None or insight.Id is None or insight.Symbol is None:
+                continue
+
             self.context.logger.debug(f'Insight: {insight.Id}')
             # Let's find the order that this insight belongs to
             order = Helper().findIn(
                 self.context.workingOrders.values(),
-                lambda v: any(i.Id == insight.Id for i in v.insights))
+                lambda v: v is not None and v.insights is not None and any(i is not None and i.Id == insight.Id for i in v.insights))
+
+            # Skip if no matching order is found
+            if order is None:
+                continue
+
+            # Skip if order ID is not in allPositions
+            if order.orderId not in self.context.allPositions:
+                continue
 
             position = self.context.allPositions[order.orderId]
 
-            target = PortfolioTarget(insight.Symbol, insight.Direction * position.orderQuantity)
+            # Handle None or invalid direction/quantity
+            direction = 0 if insight.Direction is None else insight.Direction
+            quantity = 0 if position.orderQuantity is None else position.orderQuantity
+
+            target = PortfolioTarget(insight.Symbol, direction * quantity)
             self.context.logger.debug(f'Target: {target.Symbol} {target.Quantity}')
             order.targets.append(target)
             targets.append(target)
         return targets
-
-    # Determines if the portfolio should rebalance based on the provided rebalancing func
-    # def IsRebalanceDue(self, insights: List[Insight], algorithmUtc: datetime) -> bool:
-    #     return True
-
-    # # Determines the target percent for each insight
-    # def DetermineTargetPercent(self, activeInsights: List[Insight]) -> Dict[Insight, float]:
-    #     return {}
-
-    # # Gets the target insights to calculate a portfolio target percent for, they will be piped to DetermineTargetPercent()
-    # def GetTargetInsights(self) -> List[Insight]:
-    #     return []
-
-    # # Determine if the portfolio construction model should create a target for this insight
-    # def ShouldCreateTargetForInsight(self, insight: Insight) -> bool:
-    #     return True
-
-    # OPTIONAL: Security change details
-    # def OnSecuritiesChanged(self, algorithm: QCAlgorithm, changes: SecurityChanges) -> None:
-    #     # Security additions and removals are pushed here.
-    #     # This can be used for setting up algorithm state.
-    #     # changes.AddedSecurities:
-    #     # changes.RemovedSecurities:
-    #     pass
