@@ -12,17 +12,78 @@ datetime = dt.datetime
 timedelta = dt.timedelta
 date = dt.date
 
+class Symbol:
+    def __init__(self, ticker=None, security_type=None, market=None):
+        self.Value = ticker
+        self.SecurityType = security_type
+        self.ID = MagicMock(market=market)
+
+    @staticmethod
+    def Create(symbol_str):
+        mock = Symbol(symbol_str)
+        return mock
+
+    @staticmethod
+    def create_option(underlying_symbol, market, option_style, right, strike_price, expiry_date):
+        """Mock implementation of create_option"""
+        mock = Symbol()
+        mock.ID = MagicMock(
+            underlying=MagicMock(symbol=underlying_symbol),
+            market=market,
+            option_style=option_style,
+            option_right=right,
+            strike_price=strike_price,
+            date=expiry_date
+        )
+        mock.Value = f"{underlying_symbol}_{strike_price}_{right}_{expiry_date}"
+        return mock
+
+    @staticmethod
+    def create_canonical_option(underlying_symbol, target_option, market=None, alias=None):
+        """Mock implementation of create_canonical_option matching QC's implementation
+        
+        Args:
+            underlying_symbol: The underlying symbol
+            target_option: The target option ticker (e.g. SPXW)
+            market: The market (defaults to underlying's market)
+            alias: Optional alias for symbol cache
+        """
+        mock = Symbol()
+        mock.ID = MagicMock(
+            underlying=MagicMock(symbol=underlying_symbol),
+            market=market or Market.USA,
+            option_style="European",  # Default for index options
+            date=None
+        )
+        mock.Value = f"{target_option}_CANONICAL_{market or Market.USA}"
+        mock.Underlying = underlying_symbol
+        return mock
+
+    # Make create_canonical_option also available as a class attribute for testing
+    create_canonical_option = MagicMock(side_effect=create_canonical_option.__func__)
+
+class InsightDirection:
+    """Mock of QuantConnect's InsightDirection enum"""
+    Up = 1
+    Down = -1
+    Flat = 0
+
 @dataclass
 class Insight:
     """Mock of QuantConnect's Insight class"""
-    Symbol: str = ""
+    Symbol: Union[str, Symbol] = None
     Type: str = "Price"
-    Direction: str = "Up"
+    Direction: float = InsightDirection.Up
     Period: timedelta = timedelta(days=1)
     Magnitude: float = 0.0
     Confidence: float = 0.0
     SourceModel: str = "MockModel"
     Weight: float = 0.0
+    Id: str = "test_insight_id"
+
+    def __post_init__(self):
+        if isinstance(self.Symbol, str):
+            self.Symbol = Symbol(self.Symbol)
 
     @staticmethod
     def Price(symbol, period, direction):
@@ -38,31 +99,16 @@ class Insight:
         """Mock implementation of static Group method"""
         return insights if insights else []
 
-class InsightDirection:
-    """Mock of QuantConnect's InsightDirection enum"""
-    Up = "Up"
-    Down = "Down"
-    Flat = "Flat"
-
 @dataclass
 class PortfolioTarget:
     """Mock of QuantConnect's PortfolioTarget class"""
-    _symbol: Union[str, 'Symbol']
-    _quantity: float
-    _tag: str = ""
-    minimum_order_margin_percentage_warning_sent: Optional[bool] = None
+    Symbol: Union[str, Symbol]
+    Quantity: float
+    Tag: str = ""
 
-    @property
-    def symbol(self) -> 'Symbol':
-        return self._symbol if isinstance(self._symbol, Symbol) else Symbol.Create(self._symbol)
-
-    @property
-    def quantity(self) -> float:
-        return self._quantity
-
-    @property
-    def tag(self) -> str:
-        return self._tag
+    def __post_init__(self):
+        if isinstance(self.Symbol, str):
+            self.Symbol = Symbol(self.Symbol)
 
     @staticmethod
     def percent(algorithm: 'QCAlgorithm', 
@@ -76,7 +122,7 @@ class PortfolioTarget:
         return PortfolioTarget(symbol, mock_quantity, tag)
 
     def __str__(self) -> str:
-        return f"PortfolioTarget({self.symbol}, {self.quantity}, {self.tag})"
+        return f"PortfolioTarget({self.Symbol}, {self.Quantity}, {self.Tag})"
 
 class Resolution:
     Minute = "Minute"
@@ -102,55 +148,6 @@ class OptionRight:
 
 class Market:
     USA = "USA"
-
-class Symbol:
-    @staticmethod
-    def Create(symbol_str):
-        mock = MagicMock()
-        mock.Value = symbol_str
-        return mock
-
-    @staticmethod
-    def create_option(underlying_symbol, market, option_style, right, strike_price, expiry_date):
-        """Mock implementation of create_option"""
-        mock = MagicMock()
-        mock.ID = MagicMock(
-            underlying=MagicMock(symbol=underlying_symbol),
-            market=market,
-            option_style=option_style,
-            option_right=right,
-            strike_price=strike_price,
-            date=expiry_date
-        )
-        mock.Value = f"{underlying_symbol}_{strike_price}_{right}_{expiry_date}"
-        return mock
-
-    @staticmethod
-    def create_canonical_option(underlying_symbol, target_option, market=None, alias=None):
-        """Mock implementation of create_canonical_option matching QC's implementation
-        
-        Args:
-            underlying_symbol: The underlying symbol
-            target_option: The target option ticker (e.g. SPXW)
-            market: The market (defaults to underlying's market)
-            alias: Optional alias for symbol cache
-        """
-        mock = MagicMock()
-        mock.ID = MagicMock(
-            underlying=MagicMock(symbol=underlying_symbol),
-            market=market or Market.USA,
-            option_style="European",  # Default for index options
-            date=None
-        )
-        mock.Value = f"{target_option}_CANONICAL_{market or Market.USA}"
-        mock.Underlying = underlying_symbol
-        return mock
-
-    def __init__(self):
-        pass
-
-    # Make create_canonical_option also available as a class attribute for testing
-    create_canonical_option = MagicMock(side_effect=create_canonical_option.__func__)
 
 class Security:
     """Mock of QuantConnect's Security class"""
@@ -771,6 +768,15 @@ class UpdateOrderFields:
     def __str__(self):
         return f"UpdateOrderFields(LimitPrice={self.LimitPrice}, StopPrice={self.StopPrice}, Quantity={self.Quantity}, Tag={self.Tag})"
 
+class PortfolioConstructionModel:
+    """Mock of QuantConnect's PortfolioConstructionModel class"""
+    def __init__(self):
+        pass
+
+    def CreateTargets(self, algorithm, insights):
+        """Mock implementation of CreateTargets method"""
+        return []
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -815,5 +821,6 @@ __all__ = [
     'ExecutionModel',
     'PortfolioTargetCollection',
     'Leg',
-    'UpdateOrderFields'
+    'UpdateOrderFields',
+    'PortfolioConstructionModel'
 ] 
