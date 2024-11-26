@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 from .algorithm_imports import Resolution, Chart, Series, SeriesType, Color, ScatterMarkerSymbol
+from datetime import datetime
 
 class DataHandlerMock:
     def __init__(self, context, ticker, strategy):
@@ -7,6 +8,38 @@ class DataHandlerMock:
         self.ticker = ticker
         self.strategy = strategy
         self.Resolution = Resolution
+
+class MockObjectStore:
+    def __init__(self):
+        self.stored_data = {}
+        self.saved_data = {}
+
+    def save(self, key, data):
+        self.saved_data[key] = data
+
+    def read(self, key):
+        return self.stored_data.get(key)
+
+class MockContext:
+    def __init__(self):
+        self.allPositions = {}
+        self.openPositions = {}
+        self.Time = datetime.now()
+        self.object_store = None
+        self.logger = MockLogger()
+
+    def debug(self, message):
+        self.logger.debug(message)
+
+class MockLogger:
+    def error(self, message):
+        pass
+
+    def warning(self, message):
+        pass
+
+    def debug(self, message):
+        pass
 
 class ToolsModuleMock:
     """Mock for the Tools module and its submodules"""
