@@ -35,6 +35,10 @@ class Base:
         if (len(contracts) == 0):
             return [None, None]
 
+        # Check position limits first
+        if not self.check_position_limits(order):
+            return [None, None]
+
         useLimitOrders = self.strategy.useLimitOrders
         useMarketOrders = not useLimitOrders
 
@@ -184,3 +188,79 @@ class Base:
             Base.orderCount += 1
             
         return Base.orderCount
+
+    def hasReachedMaxActivePositions(self) -> bool:
+        """Check if maximum number of active positions has been reached."""
+        openPositionsByStrategy = {
+            tag: pos for tag, pos in self.context.openPositions.items() 
+            if self.context.allPositions[pos].strategyTag == self.nameTag
+        }
+        workingOrdersByStrategy = {
+            tag: order for tag, order in self.context.workingOrders.items() 
+            if order.strategyTag == self.nameTag
+        }
+        
+        return (len(openPositionsByStrategy) + len(workingOrdersByStrategy)) >= self.maxActivePositions
+
+    def hasReachedMaxOpenPositions(self) -> bool:
+        """Check if maximum number of open orders has been reached."""
+        workingOrdersByStrategy = {
+            tag: order for tag, order in self.context.workingOrders.items() 
+            if order.strategyTag == self.nameTag
+        }
+        
+        return len(workingOrdersByStrategy) >= self.maxOpenPositions
+
+    def check_position_limits(self, order) -> bool:
+        """
+        Checks if placing this order would violate position limits.
+        Returns True if order is within limits, False otherwise.
+        """
+        # Check max active positions
+        max_active = self.strategy.parameter("maxActivePositions", 1)
+        active_positions = len([p for p in self.context.Portfolio.Values if p.Invested])
+        if active_positions >= max_active:
+            return False
+            
+        # Check max open orders
+        max_open = self.strategy.parameter("maxOpenPositions", 2)
+        open_orders = len([o for o in self.context.Transactions.GetOpenOrders()])
+        if open_orders >= max_open:
+            return False
+            
+        # Check for duplicate positions if configured
+        if self.strategy.parameter("checkForDuplicatePositions", True):
+            if self.hasDuplicateLegs(order):
+                return False
+                
+        return True
+
+    def hasDuplicateLegs(self, order) -> bool:
+        """
+        Check if any legs in the order are already part of an existing position.
+        """
+        # Get all open positions
+        open_positions = [self.context.allPositions[tag] for tag in self.context.openPositions.values()]
+        
+        # Get the expiry date from the order
+        order_expiry = order["expiry"].strftime("%Y-%m-%d")
+        
+        # Check each open position
+        for position in open_positions:
+            # Skip positions from other strategies
+            if position.strategyId != order["strategyId"]:
+                continue
+                
+            # Skip positions with different expiry dates if allowed
+            if self.strategy.parameter("allowMultipleEntriesPerExpiry", False):
+                if position.expiryStr != order_expiry:
+                    continue
+                    
+            # Check if any legs match
+            for leg in position.legs:
+                for contract in order["contracts"]:
+                    if (leg.strike == contract.Strike and 
+                        leg.contractSide == order["contractSide"][contract.Symbol]):
+                        return True
+                        
+        return False
