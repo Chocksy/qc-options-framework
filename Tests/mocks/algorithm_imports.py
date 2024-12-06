@@ -199,6 +199,8 @@ class SecurityType:
     Option = "Option"
     IndexOption = "IndexOption"
     Index = "Index"
+    Future = "Future"
+    FutureOption = "FutureOption"
 
 class TradeBar:
     """Mock of QuantConnect's TradeBar class"""
@@ -777,6 +779,11 @@ class PortfolioConstructionModel:
         """Mock implementation of CreateTargets method"""
         return []
 
+class Futures:
+    """Mock of QuantConnect's Futures class"""
+    class Indices:
+        SP_500_E_MINI = "ES"  # E-mini S&P 500 Future
+
 # Export all the mocks
 __all__ = [
     'Resolution',
@@ -822,5 +829,6 @@ __all__ = [
     'PortfolioTargetCollection',
     'Leg',
     'UpdateOrderFields',
-    'PortfolioConstructionModel'
+    'PortfolioConstructionModel',
+    'Futures'
 ] 
