@@ -84,7 +84,7 @@ with description('DataHandler') as self:
             self.data_handler.AddOptionsChain(self.underlying)
             self.algorithm.AddOption.assert_called_with(self.underlying.Symbol, self.Resolution.Minute)
 
-    with context('SetOptionFilter'):
+    with context('OptionFilterFunction'):
         with it('applies correct filter parameters'):
             universe = MagicMock()
             filtered_universe = MagicMock()
@@ -94,7 +94,7 @@ with description('DataHandler') as self:
             universe.Expiration.return_value = universe
             universe.IncludeWeeklys.return_value = filtered_universe
             
-            result = self.data_handler.SetOptionFilter(universe)
+            result = self.data_handler.OptionFilterFunction(universe)
             
             universe.Strikes.assert_called_with(-self.strategy.nStrikesLeft, self.strategy.nStrikesRight)
             universe.Expiration.assert_called_with(25, 30)  # dte=30, dteWindow=5
