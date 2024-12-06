@@ -71,6 +71,7 @@ class DataHandler:
             self.context.logger.warning("No symbols provided to optionChainProviderFilter")
             return None
 
+        # Filter by DTE first
         filteredSymbols = [symbol for symbol in symbols
                             if minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte]
 
@@ -78,12 +79,12 @@ class DataHandler:
         self.context.logger.debug(f"Context Time: {self.context.Time.date()}")
         unique_dates = set(symbol.ID.Date.date() for symbol in symbols)
         self.context.logger.debug(f"Unique symbol dates: {unique_dates}")
-        self.context.logger.debug(f"optionChainProviderFilter -> filteredSymbols: {filteredSymbols}")
 
         if not filteredSymbols:
             self.context.logger.warning("No symbols left after date filtering")
             return None
 
+        # Filter out non-tradable symbols for equities (not needed for indices)
         if not self.__CashTicker():
             filteredSymbols = [x for x in filteredSymbols if self.context.Securities[x.ID.Symbol].IsTradable]
             self.context.logger.debug(f"Tradable filtered symbols count: {len(filteredSymbols)}")
@@ -92,6 +93,7 @@ class DataHandler:
             self.context.logger.warning("No tradable symbols left after filtering")
             return None
 
+        # Get underlying price
         underlying = Underlying(self.context, self.strategy.underlyingSymbol)
         underlyingLastPrice = underlying.Price()
 
@@ -101,6 +103,7 @@ class DataHandler:
             self.context.logger.warning("Underlying price is None")
             return None
 
+        # Find ATM strike
         try:
             atm_strike = sorted(filteredSymbols, key=lambda x: abs(x.ID.StrikePrice - underlyingLastPrice))[0].ID.StrikePrice
         except IndexError:
@@ -109,16 +112,56 @@ class DataHandler:
 
         self.context.logger.debug(f"ATM strike: {atm_strike}")
 
+        # Get sorted strike list and find strike range
         strike_list = sorted(set([i.ID.StrikePrice for i in filteredSymbols]))
         atm_strike_rank = strike_list.index(atm_strike)
         min_strike = strike_list[max(0, atm_strike_rank + min_strike_rank + 1)]
         max_strike = strike_list[min(atm_strike_rank + max_strike_rank - 1, len(strike_list)-1)]
 
+        # Filter by strike range
         selectedSymbols = [symbol for symbol in filteredSymbols
                                 if min_strike <= symbol.ID.StrikePrice <= max_strike]
 
         self.context.logger.debug(f"Selected symbols count: {len(selectedSymbols)}")
 
+        # Handle dynamic DTE selection if enabled
+        if (hasattr(self, 'strategy') and hasattr(self.strategy, 'dynamicDTESelection') and 
+            self.strategy.dynamicDTESelection and hasattr(self.context, 'recentlyClosedDTE') and 
+            self.context.recentlyClosedDTE):
+            # Get the last closed DTE that's within our min DTE range
+            valid_closed_trades = [
+                trade for trade in self.context.recentlyClosedDTE 
+                if trade["closeDte"] >= minDte
+            ]
+            
+            if valid_closed_trades:
+                last_closed_dte = valid_closed_trades[0]["closeDte"]
+                # Group symbols by expiry date
+                expiry_groups = {}
+                for symbol in selectedSymbols:
+                    dte = (symbol.ID.Date.date() - self.context.Time.date()).days
+                    expiry_groups.setdefault(dte, []).append(symbol)
+                
+                # Find nearest DTE to last closed position
+                target_dte = min(expiry_groups.keys(), key=lambda x: abs(x - last_closed_dte))
+                selectedSymbols = expiry_groups[target_dte]
+
+        # Check for multiple entries per expiry if not allowed
+        if (hasattr(self, 'strategy') and hasattr(self.strategy, 'allowMultipleEntriesPerExpiry') and 
+            not self.strategy.allowMultipleEntriesPerExpiry):
+            open_expiries = set()
+            for orderId in self.context.openPositions.values():
+                position = self.context.allPositions[orderId]
+                if position.strategyTag == self.strategy.nameTag:
+                    open_expiries.add(position.expiryStr)
+            
+            # Filter out symbols with expiry dates that already have positions
+            selectedSymbols = [
+                symbol for symbol in selectedSymbols 
+                if symbol.ID.Date.strftime("%Y-%m-%d") not in open_expiries
+            ]
+
+        # Convert to ProviderOptionContract objects
         contracts = []
         for symbol in selectedSymbols:
             self.AddOptionContracts([symbol], resolution=self.context.timeResolution)

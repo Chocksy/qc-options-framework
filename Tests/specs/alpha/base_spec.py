@@ -12,7 +12,6 @@ from Tests.mocks.alpha_mocks import MockBase
 # Import after patching
 with patch_imports()[0], patch_imports()[1]:
     from Alpha.Base import Base
-    from Alpha.Utils.Scanner import Scanner
     from Alpha.Utils.Stats import Stats
     from Tests.mocks.algorithm_imports import (
         SecurityType, Resolution, OptionRight, Symbol,
@@ -94,6 +93,49 @@ with description('Alpha.Base') as self:
             expect(param_value).to(equal('default'))
 
     with context('update method'):
+        with before.each:
+            # Mock common attributes
+            self.algorithm.logger = MagicMock(debug=MagicMock())
+            self.algorithm.debug = MagicMock()
+            self.algorithm.executionTimer = MagicMock()
+            self.algorithm.Portfolio = MagicMock()
+            self.algorithm.Securities = SecuritiesDict()
+            self.algorithm.Securities['SPX'] = MagicMock(Price=1.0)
+            self.algorithm.Time = datetime.now()
+            self.algorithm.openPositions = {}
+            self.algorithm.allPositions = {}
+            self.algorithm.workingOrders = {}
+            self.algorithm.IsWarmingUp = False
+            self.algorithm.IsMarketOpen = MagicMock(return_value=True)
+            self.algorithm.dataHandler = MagicMock()
+            self.algorithm.dataHandler.getOptionContracts = MagicMock(return_value=None)
+            self.algorithm.performance = MagicMock()
+            self.algorithm.performance.OnUpdate = MagicMock()
+            
+            # Mock structure
+            self.algorithm.structure = MagicMock()
+            self.algorithm.structure.AddConfiguration = MagicMock()
+            self.algorithm.structure.checkOpenPositions = MagicMock()
+            
+            # Create Stats instance
+            self.stats = Stats()
+            
+            # Create Base instance
+            self.base = Base(self.algorithm)
+            self.base.stats = self.stats
+            self.base.underlyingSymbol = "SPX"
+            self.base.last_trade_time = None
+            
+            # Set required parameters from DEFAULT_PARAMETERS
+            for key, value in MockBase.DEFAULT_PARAMETERS.items():
+                setattr(self.base, key, value)
+                
+            # Mock data
+            self.mock_data = MagicMock()
+            
+            # Mock syncStats
+            self.base.syncStats = MagicMock()
+
         with context('market conditions'):
             with it('skips processing during warmup'):
                 self.algorithm.IsWarmingUp = True
@@ -111,24 +153,6 @@ with description('Alpha.Base') as self:
                 expect(result).to(have_length(0))
 
         with context('data processing'):
-            with before.each:
-                self.mock_data = MagicMock()
-                self.algorithm.performance = MagicMock()
-                # Mock the syncStats method
-                self.base.syncStats = MagicMock()
-                
-                # Mock structure.checkOpenPositions
-                self.algorithm.structure.checkOpenPositions = MagicMock()
-                
-                # Set up conditions to pass initial checks
-                self.algorithm.IsWarmingUp = False
-                self.algorithm.IsMarketOpen.return_value = True
-                self.algorithm.Time = datetime.now().replace(hour=10, minute=0)  # Set to market hours
-                
-                # Mock Scanner to prevent it from affecting the test
-                self.base.dataHandler = MagicMock()
-                self.base.dataHandler.getOptionContracts = MagicMock(return_value=None)
-
             with it('updates performance tracking'):
                 self.base.update(self.algorithm, self.mock_data)
                 self.algorithm.performance.OnUpdate.assert_called_once_with(self.mock_data)
@@ -426,3 +450,43 @@ with description('Alpha.Base') as self:
             self.algorithm.charting.updateCharts.assert_called_once_with(
                 symbol=self.base.underlyingSymbol
             ) 
+
+    with context('market checks'):
+        with it('detects market closed during warmup'):
+            self.algorithm.IsWarmingUp = True
+            expect(self.base.isMarketClosed()).to(be_true)
+            
+        with it('detects closed market'):
+            self.algorithm.IsMarketOpen.return_value = False
+            expect(self.base.isMarketClosed()).to(be_true)
+            
+        with it('detects open market'):
+            self.algorithm.IsWarmingUp = False
+            self.algorithm.IsMarketOpen.return_value = True
+            expect(self.base.isMarketClosed()).to(be_false)
+
+    with context('market schedule checks'):
+        with before.each:
+            self.base.context.Time = datetime.now().replace(hour=10, minute=0)
+            self.base.last_trade_time = None
+            self.base.scheduleStartTime = time(9, 30)
+            self.base.scheduleStopTime = time(16, 0)
+            
+        with it('allows trading within schedule window'):
+            expect(self.base.check_market_schedule()).to(be_true)
+            
+        with it('prevents trading before start time'):
+            self.base.context.Time = datetime.now().replace(hour=9, minute=0)
+            expect(self.base.check_market_schedule()).to(be_false)
+            
+        with it('prevents trading after stop time'):
+            self.base.context.Time = datetime.now().replace(hour=16, minute=30)
+            expect(self.base.check_market_schedule()).to(be_false)
+            
+        with it('respects minimum trade distance'):
+            self.base.last_trade_time = self.base.context.Time - timedelta(minutes=30)
+            self.base.minimumTradeScheduleDistance = timedelta(hours=1)
+            expect(self.base.check_market_schedule()).to(be_false)
+            
+            self.base.last_trade_time = self.base.context.Time - timedelta(hours=2)
+            expect(self.base.check_market_schedule()).to(be_true) 

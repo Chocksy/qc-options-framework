@@ -3,7 +3,7 @@ from AlgorithmImports import *
 #endregion
 
 from Initialization import SetupBaseStructure
-from Alpha.Utils import Scanner, Stats
+from Alpha.Utils import Stats
 from Tools import ContractUtils, Logger, Underlying
 from Strategy import Leg, Position, OrderType, WorkingOrder
 from Order import Order
@@ -201,6 +201,7 @@ class Base(AlphaModel):
         self.contractUtils = ContractUtils(context) # Initialize the contract utils
         self.stats = Stats() # Initialize the stats dictionary
         self.order = Order(context, self)
+        self.last_trade_time = None  # Initialize last trade time
         self.logger.debug(f'{self.name} -> __init__')
 
 
@@ -239,49 +240,60 @@ class Base(AlphaModel):
         Returns:
             List[Insight]: Trading insights based on the updated model and data.
         """
-        insights = []
-        # Start the timer
         self.context.executionTimer.start('Alpha.Base -> Update')
-        self.logger.debug(f'{self.name} -> update -> start')
-        self.logger.debug(f'Is Warming Up: {self.context.IsWarmingUp}')
-        self.logger.debug(f'Is Market Open: {self.context.IsMarketOpen(self.underlyingSymbol)}')
-        self.logger.debug(f'Time: {self.context.Time}')
-        # Exit if the algorithm is warming up or the market is closed (avoid processing orders on the last minute as these will be executed the following day)
-        if self.context.IsWarmingUp or\
-           not self.context.IsMarketOpen(self.underlyingSymbol) or\
-           self.context.Time.time() >= time(16, 0, 0):
-            return insights
         
-        self.logger.debug(f'Did Alpha UPDATE after warmup?!?')
-        # This thing just passes the data to the performance tool so we can keep track of all 
-        # symbols. This should not be needed if the culprit of the slonwess of backtesting is sorted.
-        self.context.performance.OnUpdate(data)
-
-        # Update the stats dictionary
+        # Update performance tracking
+        if hasattr(self.context, 'performance') and data:
+            self.context.performance.OnUpdate(data)
+        
         self.syncStats()
-
-        # Check if the workingOrders are still OK to execute
         self.context.structure.checkOpenPositions()
-
-        # Run the strategies to open new positions
-        filteredChain, lastClosedOrderTag = Scanner(self.context, self).Call(data)
-
-        self.logger.debug(f'Did Alpha SCAN')
-        self.logger.debug(f'Last Closed Order Tag: {lastClosedOrderTag}')
-        if filteredChain is not None:
-            if self.stats.hasOptions == False:
-                self.logger.info(f"Found options {self.context.Time.strftime('%A, %Y-%m-%d %H:%M')}")
-            self.stats.hasOptions = True
-            insights = self.CreateInsights(filteredChain, lastClosedOrderTag, data)
-        elif self.stats.hasOptions is None and self.context.Time.time() >= time(9, 35, 0):
-            self.stats.hasOptions = False
-            self.logger.info(f"No options data for {self.context.Time.strftime('%A, %Y-%m-%d %H:%M')}")
-            self.logger.debug(f"NOTE: Why could this happen? A: The filtering of the chain caused no contracts to be returned. Make sure to make a check on this.")
-
-        # Stop the timer
+        
+        if self.isMarketClosed():
+            return []
+        
+        if not self.check_market_schedule():
+            return []
+        
+        chain = self.context.dataHandler.getOptionContracts(data)
+        if chain is None:
+            return []
+        
+        insights = self.CreateInsights(chain, data=data)
+        
         self.context.executionTimer.stop('Alpha.Base -> Update')
         return Insight.Group(insights)
 
+    def isMarketClosed(self) -> bool:
+        """Check if the market is currently closed or if the algorithm is warming up."""
+        return self.context.IsWarmingUp or not self.context.IsMarketOpen(self.underlyingSymbol)
+
+    def check_market_schedule(self) -> bool:
+        """
+        Checks if we can trade based on market schedule and configuration parameters.
+        Returns True if trading is allowed, False otherwise.
+        """
+        current_time = self.context.Time.time()
+        
+        # Check if we're within the schedule window
+        start_time = self.scheduleStartTime
+        stop_time = self.scheduleStopTime
+        
+        if start_time and current_time < start_time:
+            return False
+            
+        if stop_time and current_time > stop_time:
+            return False
+            
+        # Check minimum trade distance if we have previous trades
+        if self.last_trade_time:
+            min_distance = self.minimumTradeScheduleDistance
+            if min_distance:
+                time_since_last = self.context.Time - self.last_trade_time
+                if time_since_last < min_distance:
+                    return False
+                    
+        return True
 
     def GetOrder(self, chain):
         """
