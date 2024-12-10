@@ -57,7 +57,7 @@ class Base(AlphaModel):
         OnSecuritiesChanged(algorithm: QCAlgorithm, changes: SecurityChanges) -> None:
             Handles changes in securities, including additions and removals.
     """
-    
+
 
     DEFAULT_PARAMETERS = {
         # The start time at which the algorithm will start scheduling the strategy execution
@@ -255,7 +255,7 @@ class Base(AlphaModel):
         if not self.check_market_schedule():
             return []
         
-        chain = self.context.dataHandler.getOptionContracts(data)
+        chain = self.dataHandler.getOptionContracts(data)
         if chain is None:
             return []
         

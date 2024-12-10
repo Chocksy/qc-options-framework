@@ -46,10 +46,15 @@ with description('Alpha.Base') as self:
             # Create Stats instance
             self.stats = Stats()
             
+            # Mock dataHandler
+            self.mock_data_handler = MagicMock()
+            self.mock_data_handler.getOptionContracts = MagicMock(return_value=None)
+            
             # Create Base instance
             self.base = Base(self.algorithm)
             self.base.stats = self.stats
             self.base.underlyingSymbol = "SPX"
+            self.base.dataHandler = self.mock_data_handler
             
             # Set required parameters from DEFAULT_PARAMETERS
             for key, value in MockBase.DEFAULT_PARAMETERS.items():

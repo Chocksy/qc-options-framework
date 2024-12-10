@@ -65,52 +65,66 @@ class DataHandler:
     # SECTION BELOW HANDLES OPTION CHAIN PROVIDER METHODS
     def optionChainProviderFilter(self, symbols, min_strike_rank, max_strike_rank, minDte, maxDte):
         self.context.executionTimer.start('Tools.DataHandler -> optionChainProviderFilter')
-        self.context.logger.debug(f"optionChainProviderFilter -> symbols count: {len(symbols)}")
-
+        
         if len(symbols) == 0:
-            self.context.logger.warning("No symbols provided to optionChainProviderFilter")
+            self.context.logger.warning("No initial symbols provided to filter")
             return None
 
+        self.context.logger.warning(f"Initial filter state: {len(symbols)} symbols, DTE range: {minDte}-{maxDte}")
+        
         # Filter by DTE first
         filteredSymbols = [symbol for symbol in symbols
-                            if minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte]
-
-        self.context.logger.debug(f"Filtered symbols count: {len(filteredSymbols)}")
-        self.context.logger.debug(f"Context Time: {self.context.Time.date()}")
-        unique_dates = set(symbol.ID.Date.date() for symbol in symbols)
-        self.context.logger.debug(f"Unique symbol dates: {unique_dates}")
-
+                          if minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte]
+        
         if not filteredSymbols:
-            self.context.logger.warning("No symbols left after date filtering")
+            self.context.logger.warning(f"All {len(symbols)} symbols filtered out by DTE range {minDte}-{maxDte}")
+            if len(symbols) > 0:
+                available_dtes = sorted(set((symbol.ID.Date.date() - self.context.Time.date()).days for symbol in symbols))
+                self.context.logger.warning(f"Available DTEs were: {available_dtes}")
             return None
 
-        # Filter out non-tradable symbols for equities (not needed for indices)
+        # Filter out non-tradable symbols for equities
         if not self.__CashTicker():
-            filteredSymbols = [x for x in filteredSymbols if self.context.Securities[x.ID.Symbol].IsTradable]
-            self.context.logger.debug(f"Tradable filtered symbols count: {len(filteredSymbols)}")
+            before_tradable = len(filteredSymbols)
+            tradable_symbols = []
+            non_tradable_reasons = []
+            
+            for symbol in filteredSymbols[:5]:  # Sample first 5 symbols for detailed logging
+                security = self.context.Securities[symbol.ID.Symbol]
+                if security.IsTradable:
+                    tradable_symbols.append(symbol)
+                else:
+                    non_tradable_reasons.append(f"Symbol {symbol.ID.Symbol}: IsTradable={security.IsTradable}")
+            
+            # If we found any tradable in the sample, use normal filtering
+            if tradable_symbols:
+                filteredSymbols = [x for x in filteredSymbols if self.context.Securities[x.ID.Symbol].IsTradable]
+            else:
+                # If none in sample were tradable, log reasons and try proceeding anyway
+                self.context.logger.warning(f"Sample non-tradable reasons: {', '.join(non_tradable_reasons)}")
+                self.context.logger.warning("Proceeding with all symbols despite tradability check")
+                # Don't filter out non-tradable symbols
+                tradable_symbols = filteredSymbols
 
-        if not filteredSymbols:
-            self.context.logger.warning("No tradable symbols left after filtering")
-            return None
+            self.context.logger.warning(f"Tradability filter: {before_tradable} -> {len(filteredSymbols)} symbols")
 
         # Get underlying price
         underlying = Underlying(self.context, self.strategy.underlyingSymbol)
         underlyingLastPrice = underlying.Price()
-
-        self.context.logger.debug(f"Underlying last price: {underlyingLastPrice}")
-
+        
         if underlyingLastPrice is None:
-            self.context.logger.warning("Underlying price is None")
+            self.context.logger.warning(f"No price available for {self.strategy.underlyingSymbol}")
             return None
-
+            
+        self.context.logger.warning(f"Underlying {self.strategy.underlyingSymbol} price: {underlyingLastPrice}")
+        
         # Find ATM strike
         try:
             atm_strike = sorted(filteredSymbols, key=lambda x: abs(x.ID.StrikePrice - underlyingLastPrice))[0].ID.StrikePrice
+            self.context.logger.warning(f"ATM strike found: {atm_strike} (Underlying: {underlyingLastPrice})")
         except IndexError:
-            self.context.logger.error("Unable to find ATM strike. Check if filteredSymbols is empty or if strike prices are available.")
+            self.context.logger.warning("Unable to find ATM strike")
             return None
-
-        self.context.logger.debug(f"ATM strike: {atm_strike}")
 
         # Get sorted strike list and find strike range
         strike_list = sorted(set([i.ID.StrikePrice for i in filteredSymbols]))
@@ -122,7 +136,7 @@ class DataHandler:
         selectedSymbols = [symbol for symbol in filteredSymbols
                                 if min_strike <= symbol.ID.StrikePrice <= max_strike]
 
-        self.context.logger.debug(f"Selected symbols count: {len(selectedSymbols)}")
+        self.context.logger.warning(f"Strike filter: {len(filteredSymbols)} -> {len(selectedSymbols)} symbols")
 
         # Handle dynamic DTE selection if enabled
         if (hasattr(self, 'strategy') and hasattr(self.strategy, 'dynamicDTESelection') and 
@@ -226,6 +240,8 @@ class DataHandler:
                 else:
                     self.context.AddOptionContract(contract, resolution)
                 self.context.optionContractsSubscriptions.append(contract)
+                # Calculate Greeks after adding the contract
+                self._initializeGreeks(self.context.Securities[contract])
 
     def OptionsContract(self, underlyingSymbol):
         if self.ticker == "SPX":
@@ -256,3 +272,26 @@ class DataHandler:
                 .IncludeWeeklys()
                 .Strikes(-self.strategy.nStrikesLeft, self.strategy.nStrikesRight)
                 .Expiration(max(0, self.strategy.dte - self.strategy.dteWindow), max(0, self.strategy.dte)))
+
+    def _initializeGreeks(self, security):
+        """Initialize Greeks for an option contract after it's been added"""
+        try:
+            if security.Type in [SecurityType.Option, SecurityType.IndexOption]:
+                right = OptionRight.CALL if security.symbol.ID.option_right == OptionRight.PUT else OptionRight.PUT
+                mirror_symbol = Symbol.create_option(
+                    security.symbol.ID.underlying.symbol,
+                    security.symbol.ID.market,
+                    security.symbol.ID.option_style,
+                    right,
+                    security.symbol.ID.strike_price,
+                    security.symbol.ID.date
+                )
+                
+                security.iv = self.context.iv(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.delta = self.context.d(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.gamma = self.context.g(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.vega = self.context.v(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.rho = self.context.r(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+                security.theta = self.context.t(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
+        except Exception as e:
+            self.context.logger.warning(f"Greeks Initialization: Data not available: {e}")
