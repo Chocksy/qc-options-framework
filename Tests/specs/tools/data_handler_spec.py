@@ -115,11 +115,12 @@ with description('DataHandler') as self:
             self.symbol1.__hash__ = lambda: hash(str(self.symbol1))
             self.symbol2.__hash__ = lambda: hash(str(self.symbol2))
             
+            # Set up test data with strikes around ATM (100)
             self.symbols = [
                 MagicMock(
                     ID=MagicMock(
                         Date=self.algorithm.Time + timedelta(days=30),
-                        StrikePrice=100,
+                        StrikePrice=95,  # Below ATM
                         Symbol=self.symbol1
                     ),
                     Value=self.symbol1,
@@ -128,8 +129,18 @@ with description('DataHandler') as self:
                 ),
                 MagicMock(
                     ID=MagicMock(
-                        Date=self.algorithm.Time + timedelta(days=25),
-                        StrikePrice=110,
+                        Date=self.algorithm.Time + timedelta(days=30),
+                        StrikePrice=100,  # ATM
+                        Symbol=self.symbol2
+                    ),
+                    Value=self.symbol2,
+                    Underlying=self.symbol2,
+                    __str__=lambda x: str(self.symbol2)
+                ),
+                MagicMock(
+                    ID=MagicMock(
+                        Date=self.algorithm.Time + timedelta(days=30),
+                        StrikePrice=105,  # Above ATM
                         Symbol=self.symbol2
                     ),
                     Value=self.symbol2,
@@ -141,16 +152,16 @@ with description('DataHandler') as self:
             # Mock the Securities dictionary with all required symbols
             self.algorithm.Securities = SecuritiesDict({
                 str(self.symbol1): MagicMock(Price=100.0, IsTradable=True),
-                str(self.symbol2): MagicMock(Price=110.0, IsTradable=True),
+                str(self.symbol2): MagicMock(Price=100.0, IsTradable=True),
                 "TEST": MagicMock(Price=100.0, IsTradable=True)
             })
 
         with it('filters contracts by date and strike correctly'):
             result = self.data_handler.optionChainProviderFilter(
-                self.symbols, -2, 2, 25, 30
+                self.symbols, -1, 1, 25, 30  # -1 to +1 strikes around ATM
             )
             
-            expect(result).to(have_length(2))
+            expect(result).to(have_length(3))  # Should include 95, 100, and 105
             self.algorithm.executionTimer.start.assert_called()
             self.algorithm.executionTimer.stop.assert_called()
 
