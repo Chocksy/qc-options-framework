@@ -65,17 +65,29 @@ class DataHandler:
     # SECTION BELOW HANDLES OPTION CHAIN PROVIDER METHODS
     def optionChainProviderFilter(self, symbols, min_strike_rank, max_strike_rank, minDte, maxDte):
         self.context.executionTimer.start('Tools.DataHandler -> optionChainProviderFilter')
-        
+
         if len(symbols) == 0:
             self.context.logger.warning("No initial symbols provided to filter")
             return None
 
         self.context.logger.warning(f"Initial filter state: {len(symbols)} symbols, DTE range: {minDte}-{maxDte}")
-        
+
+        # Check minimum trade distance
+        minimumTradeScheduleDistance = self.strategy.parameter("minimumTradeScheduleDistance", timedelta(hours=0))
+        if (hasattr(self.context, 'lastOpenedDttm') and self.context.lastOpenedDttm is not None and 
+            self.context.Time < (self.context.lastOpenedDttm + minimumTradeScheduleDistance)):
+            return None
+
         # Filter by DTE first
+        self.context.logger.warning(f"Filtering by DTE: {minDte}-{maxDte}")
+        self.context.logger.warning(f"Current time: {self.context.Time.date()}")
+        for symbol in symbols[:5]:  # Log first 5 symbols
+            dte = (symbol.ID.Date.date() - self.context.Time.date()).days
+            self.context.logger.warning(f"Symbol {symbol.ID.Symbol}: DTE={dte}, Strike={symbol.ID.StrikePrice}")
+
         filteredSymbols = [symbol for symbol in symbols
                           if minDte <= (symbol.ID.Date.date() - self.context.Time.date()).days <= maxDte]
-        
+
         if not filteredSymbols:
             self.context.logger.warning(f"All {len(symbols)} symbols filtered out by DTE range {minDte}-{maxDte}")
             if len(symbols) > 0:
@@ -83,19 +95,54 @@ class DataHandler:
                 self.context.logger.warning(f"Available DTEs were: {available_dtes}")
             return None
 
+        # Get unique expiry dates
+        expiry_dates = sorted(set(symbol.ID.Date for symbol in filteredSymbols), reverse=True)
+        
+        # Handle dynamic DTE selection if enabled
+        if (hasattr(self.strategy, 'dynamicDTESelection') and self.strategy.dynamicDTESelection and 
+            hasattr(self.context, 'recentlyClosedDTE') and self.context.recentlyClosedDTE):
+            valid_closed_trades = [
+                trade for trade in self.context.recentlyClosedDTE 
+                if trade["closeDte"] >= minDte
+            ]
+            if valid_closed_trades:
+                last_closed_dte = valid_closed_trades[0]["closeDte"]
+                # Find expiry date closest to last closed DTE
+                target_expiry = min(expiry_dates, 
+                                  key=lambda x: abs((x.date() - self.context.Time.date()).days - last_closed_dte))
+                filteredSymbols = [s for s in filteredSymbols if s.ID.Date == target_expiry]
+        else:
+            # Use furthest/earliest expiry based on useFurthestExpiry
+            selected_expiry = expiry_dates[0 if self.strategy.useFurthestExpiry else -1]
+            filteredSymbols = [s for s in filteredSymbols if s.ID.Date == selected_expiry]
+
+        # Filter based on allowMultipleEntriesPerExpiry
+        if (hasattr(self.strategy, 'allowMultipleEntriesPerExpiry') and 
+            not self.strategy.allowMultipleEntriesPerExpiry):
+            open_expiries = set()
+            for orderId in self.context.openPositions.values():
+                position = self.context.allPositions[orderId]
+                if position.strategyTag == self.strategy.nameTag:
+                    open_expiries.add(position.expiryStr)
+            
+            filteredSymbols = [
+                symbol for symbol in filteredSymbols 
+                if symbol.ID.Date.strftime("%Y-%m-%d") not in open_expiries
+            ]
+
         # Filter out non-tradable symbols for equities
         if not self.__CashTicker():
             before_tradable = len(filteredSymbols)
             tradable_symbols = []
             non_tradable_reasons = []
-            
+
             for symbol in filteredSymbols[:5]:  # Sample first 5 symbols for detailed logging
                 security = self.context.Securities[symbol.ID.Symbol]
                 if security.IsTradable:
                     tradable_symbols.append(symbol)
                 else:
                     non_tradable_reasons.append(f"Symbol {symbol.ID.Symbol}: IsTradable={security.IsTradable}")
-            
+
             # If we found any tradable in the sample, use normal filtering
             if tradable_symbols:
                 filteredSymbols = [x for x in filteredSymbols if self.context.Securities[x.ID.Symbol].IsTradable]
@@ -111,13 +158,13 @@ class DataHandler:
         # Get underlying price
         underlying = Underlying(self.context, self.strategy.underlyingSymbol)
         underlyingLastPrice = underlying.Price()
-        
+
         if underlyingLastPrice is None:
             self.context.logger.warning(f"No price available for {self.strategy.underlyingSymbol}")
             return None
-            
+
         self.context.logger.warning(f"Underlying {self.strategy.underlyingSymbol} price: {underlyingLastPrice}")
-        
+
         # Find ATM strike
         try:
             atm_strike = sorted(filteredSymbols, key=lambda x: abs(x.ID.StrikePrice - underlyingLastPrice))[0].ID.StrikePrice
@@ -128,52 +175,29 @@ class DataHandler:
 
         # Get sorted strike list and find strike range
         strike_list = sorted(set([i.ID.StrikePrice for i in filteredSymbols]))
-        atm_strike_rank = strike_list.index(atm_strike)
-        min_strike = strike_list[max(0, atm_strike_rank + min_strike_rank + 1)]
-        max_strike = strike_list[min(atm_strike_rank + max_strike_rank - 1, len(strike_list)-1)]
+        atm_strike = sorted(filteredSymbols, key=lambda x: abs(x.ID.StrikePrice - underlyingLastPrice))[0].ID.StrikePrice
+        
+        self.context.logger.warning(f"Strike list: {strike_list}")
+        self.context.logger.warning(f"ATM strike: {atm_strike}")
+        
+        # Find the index of the ATM strike
+        atm_index = strike_list.index(atm_strike)
+        
+        # Calculate min and max indices, ensuring we don't go out of bounds
+        min_index = max(0, atm_index + min_strike_rank)
+        max_index = min(len(strike_list) - 1, atm_index + max_strike_rank)
+        
+        # Get the actual strike prices at these indices
+        min_strike = strike_list[min_index]
+        max_strike = strike_list[max_index]
+        
+        self.context.logger.warning(f"Strike range: {min_strike} - {max_strike}")
 
-        # Filter by strike range
+        # Filter by strike range (inclusive)
         selectedSymbols = [symbol for symbol in filteredSymbols
                                 if min_strike <= symbol.ID.StrikePrice <= max_strike]
 
         self.context.logger.warning(f"Strike filter: {len(filteredSymbols)} -> {len(selectedSymbols)} symbols")
-
-        # Handle dynamic DTE selection if enabled
-        if (hasattr(self, 'strategy') and hasattr(self.strategy, 'dynamicDTESelection') and 
-            self.strategy.dynamicDTESelection and hasattr(self.context, 'recentlyClosedDTE') and 
-            self.context.recentlyClosedDTE):
-            # Get the last closed DTE that's within our min DTE range
-            valid_closed_trades = [
-                trade for trade in self.context.recentlyClosedDTE 
-                if trade["closeDte"] >= minDte
-            ]
-            
-            if valid_closed_trades:
-                last_closed_dte = valid_closed_trades[0]["closeDte"]
-                # Group symbols by expiry date
-                expiry_groups = {}
-                for symbol in selectedSymbols:
-                    dte = (symbol.ID.Date.date() - self.context.Time.date()).days
-                    expiry_groups.setdefault(dte, []).append(symbol)
-                
-                # Find nearest DTE to last closed position
-                target_dte = min(expiry_groups.keys(), key=lambda x: abs(x - last_closed_dte))
-                selectedSymbols = expiry_groups[target_dte]
-
-        # Check for multiple entries per expiry if not allowed
-        if (hasattr(self, 'strategy') and hasattr(self.strategy, 'allowMultipleEntriesPerExpiry') and 
-            not self.strategy.allowMultipleEntriesPerExpiry):
-            open_expiries = set()
-            for orderId in self.context.openPositions.values():
-                position = self.context.allPositions[orderId]
-                if position.strategyTag == self.strategy.nameTag:
-                    open_expiries.add(position.expiryStr)
-            
-            # Filter out symbols with expiry dates that already have positions
-            selectedSymbols = [
-                symbol for symbol in selectedSymbols 
-                if symbol.ID.Date.strftime("%Y-%m-%d") not in open_expiries
-            ]
 
         # Convert to ProviderOptionContract objects
         contracts = []
@@ -286,7 +310,7 @@ class DataHandler:
                     security.symbol.ID.strike_price,
                     security.symbol.ID.date
                 )
-                
+
                 security.iv = self.context.iv(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
                 security.delta = self.context.d(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
                 security.gamma = self.context.g(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
