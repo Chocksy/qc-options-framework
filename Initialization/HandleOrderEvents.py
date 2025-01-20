@@ -34,7 +34,6 @@ class HandleOrderEvents:
         self.context = context
         self.orderEvent = orderEvent
         self.logger = Logger(self.context, className=type(self.context).__name__, logLevel=self.context.logLevel)
-        self.positions_store = PositionsStore(context)
 
     def Call(self):
         context = self.context
@@ -43,7 +42,7 @@ class HandleOrderEvents:
         context.executionTimer.start()
         
         if self.context.LiveMode:
-            self.positions_store.store_positions()
+            self.context.positions_store.store_positions()
 
         if not (orderEvent.Status == OrderStatus.Filled or orderEvent.Status == OrderStatus.PartiallyFilled):
             return
