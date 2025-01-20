@@ -137,10 +137,6 @@ class CentralAlgorithm(QCAlgorithm):
         self.executionTimer.stop()
 
     def OnEndOfAlgorithm(self) -> None:
-        # store positions in live mode
-        if self.LiveMode:
-            self.positions_store.store_positions()
-
         # Convert the dictionary into a Pandas Data Frame
         # dfAllPositions = pd.DataFrame.from_dict(self.allPositions, orient = "index")
         # Convert the dataclasses into Pandas Data Frame
