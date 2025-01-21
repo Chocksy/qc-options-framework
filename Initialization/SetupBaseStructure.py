@@ -198,27 +198,12 @@ class SetupBaseStructure:
         elif security.Type in [SecurityType.Option, SecurityType.IndexOption]:
             # This is for options.
             security.SetFillModel(BetaFillModel(self.context))
-            # security.SetFillModel(MidPriceFillModel(self))
             security.SetFeeModel(TastyWorksFeeModel())
             security.PriceModel = OptionPriceModels.CrankNicolsonFD()
-            # security.set_option_assignment_model(NullOptionAssignmentModel())
+            # Disable option assignment for index options
+            if security.Type == SecurityType.IndexOption:
+                security.SetOptionAssignmentModel(NullOptionAssignmentModel())
 
-            right = OptionRight.CALL if security.symbol.ID.option_right == OptionRight.PUT else OptionRight.PUT
-            mirror_symbol = Symbol.create_option(security.symbol.ID.underlying.symbol, security.symbol.ID.market, security.symbol.ID.option_style, right, security.symbol.ID.strike_price, security.symbol.ID.date)
-            try:
-                security.iv = self.context.iv(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                security.delta = self.context.d(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                security.gamma = self.context.g(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                security.vega = self.context.v(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                security.rho = self.context.r(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-                security.theta = self.context.t(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
-
-            except Exception as e:
-                self.context.logger.warning(f"Security Initializer: Data not available: {e}") 
-
-        if security.Type == SecurityType.IndexOption:
-            # disable option assignment. This is important for SPX but we disable for all for now.
-            security.SetOptionAssignmentModel(NullOptionAssignmentModel())
         self.context.executionTimer.stop()
 
     def ClearSecurity(self, security: Security) -> None:
