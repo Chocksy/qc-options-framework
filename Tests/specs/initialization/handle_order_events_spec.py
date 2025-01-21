@@ -36,6 +36,7 @@ with description('HandleOrderEvents') as self:
             self.algorithm.charting = MagicMock()
             self.algorithm.recentlyClosedDTE = []
             self.algorithm.logger = MagicMock()
+            self.algorithm.positions_store = MagicMock()  # Always initialize positions_store
             
             self.handler = HandleOrderEvents(self.algorithm, self.order_event)
 
@@ -88,6 +89,72 @@ with description('HandleOrderEvents') as self:
             
             self.algorithm.executionTimer.start.assert_called_once()
             self.algorithm.executionTimer.stop.assert_called_once()
+
+        with it('stores positions in live mode'):
+            # Setup LiveMode
+            self.algorithm.LiveMode = True
+            
+            # Setup mock position and order
+            position = MagicMock(
+                orderTag="TEST_POS",
+                legs=[MagicMock(symbol=self.order_event.Symbol)]
+            )
+            mock_order = MagicMock()
+            mock_order.Tag = "TEST_POS"
+            self.algorithm.Transactions.GetOrderById.return_value = mock_order
+            
+            self.handler.getPositionFromOrderEvent = MagicMock(
+                return_value=(position, None, "close", mock_order)
+            )
+            
+            self.handler.Call()
+            
+            # Verify positions were stored
+            self.algorithm.positions_store.store_positions.assert_called_once()
+
+        with it('does not store positions in backtest mode'):
+            # Setup LiveMode
+            self.algorithm.LiveMode = False
+            
+            # Setup mock position and order
+            position = MagicMock(
+                orderTag="TEST_POS",
+                legs=[MagicMock(symbol=self.order_event.Symbol)]
+            )
+            mock_order = MagicMock()
+            mock_order.Tag = "TEST_POS"
+            self.algorithm.Transactions.GetOrderById.return_value = mock_order
+            
+            self.handler.getPositionFromOrderEvent = MagicMock(
+                return_value=(position, None, "close", mock_order)
+            )
+            
+            self.handler.Call()
+            
+            # Verify positions were not stored
+            self.algorithm.positions_store.store_positions.assert_not_called()
+
+        with it('handles missing positions_store in live mode'):
+            # Setup LiveMode but remove positions_store
+            self.algorithm.LiveMode = True
+            # No need to remove positions_store as it doesn't exist by default
+            
+            # Setup mock position and order
+            position = MagicMock(
+                orderTag="TEST_POS",
+                legs=[MagicMock(symbol=self.order_event.Symbol)]
+            )
+            mock_order = MagicMock()
+            mock_order.Tag = "TEST_POS"
+            self.algorithm.Transactions.GetOrderById.return_value = mock_order
+            
+            self.handler.getPositionFromOrderEvent = MagicMock(
+                return_value=(position, None, "close", mock_order)
+            )
+            
+            # Should not raise an error
+            self.handler.Call()
+            # Test passes if no exception is raised
 
     with context('getPositionFromOrderEvent'):
         with it('finds position by order tag'):

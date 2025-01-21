@@ -40,7 +40,7 @@ class HandleOrderEvents:
         orderEvent = self.orderEvent
 
         context.executionTimer.start()
-        
+
         if self.context.LiveMode:
             self.context.positions_store.store_positions()
 
