@@ -1,0 +1,1 @@
+- When writing python code stop checking for method existance like this hasattr(self, 'logger'). Its noisy. It adds unecesarry code.

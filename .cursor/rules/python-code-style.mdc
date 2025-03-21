@@ -1,0 +1,86 @@
+---
+description: Python Code Style Guidelines
+globs: *.py
+alwaysApply: false
+---
+# Python Code Style Guidelines
+
+Rules for writing clean, maintainable, and confident Python code.
+
+<rule>
+name: python_code_style
+description: Standards for writing Python code that is clean, maintainable, and confident
+
+principles:
+  - Write confident code that assumes correct initialization
+  - Avoid defensive programming patterns unless absolutely necessary
+  - Keep code slim and focused
+  - Ensure correctness through design, not runtime checks
+
+guidelines:
+  1. Initialization and Dependencies:
+     - Initialize all required attributes in __init__
+     - Document dependencies clearly in docstrings
+     - Use type hints to make dependencies explicit
+     - AVOID checking for attribute existence with hasattr()
+     - If a method requires certain attributes, ensure they exist in __init__
+
+  2. Error Handling:
+     - Let errors surface early rather than masking them
+     - Only catch specific exceptions you can handle meaningfully
+     - AVOID broad try/except blocks
+     - Use assertions for development-time checks, not runtime safety
+
+  3. Code Structure:
+     - Keep methods focused and single-purpose
+     - Use clear, descriptive names
+     - Document complex logic with comments
+     - Break complex operations into well-named helper methods
+
+  4. Class Design:
+     - Make dependencies explicit in constructor
+     - Initialize all needed attributes upfront
+     - Document class responsibilities clearly
+     - Use property decorators instead of getters/setters
+
+anti_patterns:
+  - Checking for attribute existence with hasattr() everywhere
+  - Broad try/except blocks that mask errors
+  - Defensive programming that assumes broken state
+  - Complex conditional chains checking for None
+
+examples:
+  - bad: |
+      # Too defensive, masks potential bugs
+      def process_data(self):
+          if hasattr(self, 'data_handler'):
+              if self.data_handler is not None:
+                  if hasattr(self.data_handler, 'process'):
+                      self.data_handler.process()
+
+  - good: |
+      # Confident code that assumes correct initialization
+      def __init__(self, data_handler):
+          self.data_handler = data_handler  # Will raise if None
+          
+      def process_data(self):
+          self.data_handler.process()  # Clear and direct
+
+  - bad: |
+      # Unnecessary attribute checking
+      def log_message(self):
+          if hasattr(self, 'logger'):
+              self.logger.info("Message")
+
+  - good: |
+      # Ensure logger exists in __init__
+      def __init__(self, context):
+          self.logger = Logger(context)
+          
+      def log_message(self):
+          self.logger.info("Message")
+
+metadata:
+  priority: high
+  version: 1.0
+</rule> 

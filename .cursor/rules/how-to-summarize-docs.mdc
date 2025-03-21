@@ -1,0 +1,11 @@
+---
+description: How to summarize markdown documentation pages
+globs: *.md
+---
+Summarize the most important piece from the document md file and rewrite it to properly have the KEY features. We will use this to expand our own algo code later so we don't need every little detail when e send to LLM to read.
+
+Important:
+- short detail about each chapter
+- small code example for each chapter if present
+- if a table is present all data or options should be present as those usually are method attributes etc.
+- do not add the C# version of the code as we only use python
