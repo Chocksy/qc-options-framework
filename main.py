@@ -115,6 +115,13 @@ class CentralAlgorithm(QCAlgorithm):
             self.structure.ClearSecurity(security)
 
     def OnEndOfDay(self, symbol):
+        # Debug message to verify OnEndOfDay is called
+        self.Log(f"DEBUG: OnEndOfDay called for symbol {symbol}")
+        
+        # Process and output the daily logs
+        # The logger will handle live mode appropriately
+        self.logger.process_and_output_daily_logs()
+            
         self.structure.checkOpenPositions()
         self.performance.endOfDay(symbol)
 
@@ -137,6 +144,13 @@ class CentralAlgorithm(QCAlgorithm):
         self.executionTimer.stop()
 
     def OnEndOfAlgorithm(self) -> None:
+        # store positions in live mode
+        if self.LiveMode:
+            self.positions_store.store_positions()
+        else:
+            # Process and output the daily logs
+            self.logger.process_and_output_daily_logs()
+
         # Convert the dictionary into a Pandas Data Frame
         # dfAllPositions = pd.DataFrame.from_dict(self.allPositions, orient = "index")
         # Convert the dataclasses into Pandas Data Frame
@@ -178,7 +192,3 @@ class CentralAlgorithm(QCAlgorithm):
         # Find the last trading day for the given expiration date
         lastDay = list(tradingCalendar.GetDaysByType(TradingDayType.BusinessDay, expiry - timedelta(days = 20), expiry))[-1].Date
         return lastDay
-
-
-
-
