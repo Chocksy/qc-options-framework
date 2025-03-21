@@ -3,14 +3,22 @@ Options framework that allows for an easier implementation of option strategies 
 
 ## Setup
 
-In order to make this easier you need to have quantconnect running on local dev. That means 
+In order to make this easier you need to have quantconnect running on local dev. That means:
 
-1. Create a new quant connect algorithm. 
+1. Create a new quant connect algorithm
 2. Clone this repository
-3. Install the quantconnect [extension](https://marketplace.visualstudio.com/items?itemName=quantconnect.quantconnect) on VSCode and setup your env
-4. Open your newly created algorithm on your local environment
-5. Copy all the files from the cloned repo to this quantconnect algo
-6. Start creating your own AlphaModel, MonitorModel and ExecutionModel (optional)
+3. Install [PDM](https://pdm.fming.dev/) if you haven't already:
+   ```bash
+   pip install --user pdm
+   ```
+4. Install the quantconnect [extension](https://marketplace.visualstudio.com/items?itemName=quantconnect.quantconnect) on VSCode and setup your env
+5. Open your newly created algorithm on your local environment
+6. Copy all the files from the cloned repo to this quantconnect algo
+7. Install dependencies using PDM:
+   ```bash
+   pdm install
+   ```
+8. Start creating your own AlphaModel, MonitorModel and ExecutionModel (optional)
 
 
 ## Some explanation of how it works
