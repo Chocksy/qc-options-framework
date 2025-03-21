@@ -1,0 +1,40 @@
+[project]
+name = "qc-options-framework"
+version = "0.9.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Ciocanel Razvan", email = "chocksy@gmail.com"},
+]
+dependencies = [
+    "args",
+    "clint",
+    "contourpy",
+    "coverage",
+    "cycler",
+    "fonttools",
+    "kiwisolver",
+    "mamba",
+    "matplotlib",
+    "numpy",
+    "packaging",
+    "pandas",
+    "pillow",
+    "pyparsing",
+    "python-dateutil",
+    "pytz",
+    "quantconnect-stubs",
+    "six",
+    "tzdata",
+    "expects",
+    "pytest",
+    "mock",
+    "scipy>=1.10.0,<1.11.0",
+    "ipdb",
+]
+requires-python = "==3.8.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false

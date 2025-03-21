@@ -21,21 +21,20 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install pipenv
+    - name: Install PDM
       run: |
         python -m pip install --upgrade pip
-        pip install pipenv
+        pip install pdm
 
     - name: Install dependencies
       run: |
-        pipenv install --dev --skip-lock
-        pipenv install coverage mamba --skip-lock
-        pipenv run pip list  # Debug: show installed packages
+        pdm install
+        pdm list  # Debug: show installed packages
 
     - name: Run tests
       run: |
         chmod +x run_tests.sh
-        CI=true pipenv run ./run_tests.sh
+        CI=true pdm run ./run_tests.sh
 
     - name: Upload coverage reports to Codecov
       if: always()
@@ -54,7 +53,6 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         
-
     - name: Upload coverage report artifact
       if: always()
       uses: actions/upload-artifact@v3
