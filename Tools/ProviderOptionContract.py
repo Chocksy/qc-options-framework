@@ -24,23 +24,38 @@ class ProviderOptionContract:
             
         @property
         def delta(self):
-            return self.security.delta.current.value if self.security.delta else 0
+            try:
+                return self.security.delta.current.value if hasattr(self.security, 'delta') and self.security.delta else 0
+            except:
+                return 0
 
         @property
         def gamma(self):
-            return self.security.gamma.current.value if self.security.gamma else 0
+            try:
+                return self.security.gamma.current.value if hasattr(self.security, 'gamma') and self.security.gamma else 0
+            except:
+                return 0
 
         @property
         def theta(self):
-            return self.security.theta.current.value if self.security.theta else 0
+            try:
+                return self.security.theta.current.value if hasattr(self.security, 'theta') and self.security.theta else 0
+            except:
+                return 0
 
         @property
         def vega(self):
-            return self.security.vega.current.value if self.security.vega else 0
+            try:
+                return self.security.vega.current.value if hasattr(self.security, 'vega') and self.security.vega else 0
+            except:
+                return 0
 
         @property
         def rho(self):
-            return self.security.rho.current.value if self.security.rho else 0
+            try:
+                return self.security.rho.current.value if hasattr(self.security, 'rho') and self.security.rho else 0
+            except:
+                return 0
 
 
     @property

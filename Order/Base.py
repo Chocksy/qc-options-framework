@@ -135,7 +135,7 @@ class Base:
             )
         )
 
-        self.logger.debug(f"buildOrderPosition -> position: {position}")
+        self.logger.debug(f"buildOrderPosition -> position: {position.summarize()}")
 
         # Create combo orders by using the provided method instead of always calling MarketOrder.
         insights = []
@@ -167,7 +167,7 @@ class Base:
             fills=0
         )
 
-        self.logger.debug(f"buildOrderPosition -> workingOrder: {workingOrder}")
+        self.logger.debug(f"buildOrderPosition -> workingOrder: {workingOrder.summarize()}")
 
         return [position, workingOrder]
 

@@ -74,8 +74,11 @@ class Base(ExecutionModel):
         self.targetsCollection.AddRange(targets)
         self.logger.debug(f"{self.__class__.__name__} -> Execute -> targets: {targets}")
         self.logger.debug(f"{self.__class__.__name__} -> Execute -> targets count: {len(targets)}")
-        self.logger.debug(f"{self.__class__.__name__} -> Execute -> workingOrders: {self.context.workingOrders}")
-        self.logger.debug(f"{self.__class__.__name__} -> Execute -> allPositions: {self.context.allPositions}")
+        self.logger.debug(f"{self.__class__.__name__} -> Execute -> workingOrders: {self.logger.summarize_dict(self.context.workingOrders)}")
+        
+        # Replace the verbose allPositions log with a summarized version
+        self.logger.debug(f"{self.__class__.__name__} -> Execute -> allPositions: {self.logger.summarize_dict(self.context.allPositions)}")
+        
         # Check if the workingOrders are still OK to execute
         self.context.structure.checkOpenPositions()
         self.logger.debug(f"{self.__class__.__name__} -> Execute -> checkOpenPositions")
@@ -90,8 +93,8 @@ class Base(ExecutionModel):
             useLimitOrders = order.useLimitOrder
             useMarketOrders = not useLimitOrders
             self.logger.debug(f"Processing order: {order.orderId}")
-            self.logger.debug(f"Order details: {order}")
-            self.logger.debug(f"Position details: {position}")
+            self.logger.debug(f"Order details: {order.summarize()}")
+            self.logger.debug(f"Position details: {position.summarize()}")
             self.logger.debug(f"Use Limit Orders: {useLimitOrders}")
             self.logger.debug(f"Use Market Orders: {useMarketOrders}")
             if useMarketOrders:

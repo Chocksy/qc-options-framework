@@ -131,6 +131,39 @@ class WorkingOrder(_ParentBase):
     limitOrderPrice: float = 0.0
     lastRetry: Optional[datetime.date] = None
     fillRetries: int = 0 # number retries to get a fill
+    
+    def summarize(self):
+        """
+        Returns a concise representation of the working order with only essential fields.
+        This is useful for logging purposes to avoid very verbose output.
+        
+        Returns:
+            dict: A dictionary with essential working order information
+        """
+        # Create summary dict with essential fields
+        summary = {
+            "positionKey": self.positionKey,
+            "orderId": self.orderId,
+            "strategyTag": self.strategyTag,
+            "orderType": self.orderType,
+            "fills": self.fills,
+            "fillRetries": self.fillRetries,
+            "useLimitOrder": self.useLimitOrder,
+            "limitOrderPrice": self.limitOrderPrice
+        }
+        
+        # Add lastRetry if present, formatted as a string
+        if self.lastRetry is not None:
+            summary["lastRetry"] = str(self.lastRetry)
+            
+        # Add insight and target counts instead of full objects
+        if self.insights:
+            summary["insightsCount"] = len(self.insights)
+            
+        if self.targets:
+            summary["targetsCount"] = len(self.targets)
+            
+        return summary
 
 @dataclass
 class Leg(_ParentBase):
@@ -614,3 +647,48 @@ class Position(_ParentBase):
             ticket = context.Transactions.GetOrderTicket(id)
             if ticket:
                 ticket.Cancel()
+
+    def summarize(self):
+        """
+        Returns a concise representation of the position with only essential fields.
+        This is useful for logging purposes to avoid very verbose output.
+        
+        Returns:
+            dict: A dictionary with essential position information
+        """
+        # Extract contract info from legs in a more informative way
+        leg_info = []
+        for leg in self.legs:
+            leg_info.append({
+                "strike": leg.strike,
+                "contractSide": leg.contractSide,
+                "isCall": leg.isCall if hasattr(leg, 'isCall') and leg.contract else None
+            })
+        
+        # Create summary dict with essential fields
+        summary = {
+            "orderId": self.orderId,
+            "orderTag": self.orderTag,
+            "strategyId": self.strategyId,
+            "strategyTag": self.strategyTag,
+            "expiryStr": self.expiryStr,
+            "legs": leg_info,
+            "filled": self.filled,
+            "orderCancelled": self.orderCancelled,
+            "openOrder": {
+                "filled": self.openOrder.filled,
+                "fills": self.openOrder.fills,
+                "limitPrice": self.openOrder.limitOrderPrice,
+                "midPrice": self.openOrder.midPrice
+            }
+        }
+        
+        # Add DIT (days in trade) if the position has been opened
+        if self.openDttm:
+            summary["DIT"] = self.DIT
+            
+        # Add PnL information if available
+        if self.PnL != 0.0:
+            summary["PnL"] = self.PnL
+            
+        return summary

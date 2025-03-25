@@ -325,8 +325,8 @@ class Base(AlphaModel):
             position, workingOrder = self.order.buildOrderPosition(single_order, lastClosedOrderTag)
             
 
-            self.logger.debug(f"CreateInsights -> position: {position}")
-            self.logger.debug(f"CreateInsights -> workingOrder: {workingOrder}")
+            self.logger.debug(f"CreateInsights -> position: {position.summarize() if position else None}")
+            self.logger.debug(f"CreateInsights -> workingOrder: {workingOrder.summarize() if workingOrder else None}")
             
             if position is None:
                 continue

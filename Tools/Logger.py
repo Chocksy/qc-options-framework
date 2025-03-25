@@ -29,16 +29,57 @@ class LogMessage:
     def base_hash(self):
         if self._base_hash is None:
             import re
-            template = re.sub(r'[-+]?\d*\.\d+|\d+', 'NUM', self.message)
-            content = f"{self.level}|{self.class_name}|{self.function_name}|{template}"
-            self._base_hash = hashlib.md5(content.encode()).hexdigest()
+            try:
+                # Standardize the message by:
+                # 1. Replacing all numeric values with "NUM"
+                # 2. Normalizing whitespace
+                # 3. Converting to lowercase for case-insensitive matching
+                # 4. Removing any special characters that might vary
+                
+                # First replace all numbers with NUM
+                template = re.sub(r'[-+]?[0-9,]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?', 'NUM', self.message)
+                
+                # Normalize whitespace (multiple spaces to single space)
+                template = re.sub(r'\s+', ' ', template)
+                
+                # Convert to lowercase
+                template = template.lower()
+                
+                # Remove some common variable characters
+                template = re.sub(r'[:\[\]{}()]', '', template)
+                
+                # Create a content string with essential parts
+                content = f"{self.level.lower()}|{self.class_name.lower()}|{self.function_name.lower()}|{template}"
+                
+                # Hash the standardized content
+                self._base_hash = hashlib.md5(content.encode()).hexdigest()
+            except Exception:
+                # Fallback to a simpler hash if there's an error
+                content = f"{self.level}|{self.class_name}|{self.function_name}"
+                self._base_hash = hashlib.md5(content.encode()).hexdigest()
         return self._base_hash
 
     def extract_value(self):
         """Extract the numeric value from a message, assuming it's the last number"""
         import re
-        numbers = re.findall(r'[-+]?\d*\.\d+|\d+', self.message)
-        return float(numbers[-1]) if numbers else None
+        try:
+            # Enhanced pattern to catch more numeric formats
+            # This pattern catches: integers, floats, scientific notation, and numbers with commas
+            pattern = r'[-+]?[0-9,]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?'
+            numbers = re.findall(pattern, self.message)
+            
+            # Clean up any numbers with commas
+            cleaned_numbers = []
+            for num in numbers:
+                if ',' in num:
+                    num = num.replace(',', '')
+                cleaned_numbers.append(num)
+                
+            # Try to return the last number if any were found
+            return float(cleaned_numbers[-1]) if cleaned_numbers else None
+        except Exception:
+            # If any error occurs during extraction, log it and return None
+            return None
 
 class MessageGroup:
     def __init__(self, first_message):
@@ -182,7 +223,6 @@ class Logger:
         self.context = context
         self.className = className
         self.logLevel = logLevel
-        self.last_summary_day = None
         
         if not hasattr(self.context, 'logger_storage'):
             self.context.logger_storage = {
@@ -190,9 +230,19 @@ class Logger:
                 'message_groups': defaultdict(list),  # base_hash -> MessageGroup
             }
 
+        # Add logger_context for shared state across logger instances
+        if not hasattr(self.context, 'logger_context'):
+            self.context.logger_context = {
+                'last_summary_day': None
+            }
+
     def Log(self, msg, trsh=0):
         if trsh > self.logLevel:
             return
+        
+        # Check if message is a string, if not convert with a warning
+        if not isinstance(msg, str):
+            msg = f"PLEASE USE string messages: {str(msg)}"
             
         log_msg = LogMessage(
             level=["ERROR", "WARNING", "INFO", "DEBUG", "TRACE"][min(trsh, 4)],
@@ -206,21 +256,36 @@ class Logger:
             self._log_immediate(log_msg)
             return
 
-        # Try to extract a value - if successful, group the message
+        # Store message in the appropriate collection
         try:
-            if log_msg.extract_value() is not None:
+            # First try to extract a numeric value
+            numeric_value = log_msg.extract_value()
+            
+            if numeric_value is not None:
+                # If we got a numeric value, try to add to an existing group or create a new one
                 groups = self.context.logger_storage['message_groups']
                 if log_msg.base_hash not in groups:
+                    # Create a new message group
                     groups[log_msg.base_hash] = MessageGroup(log_msg)
                 else:
-                    groups[log_msg.base_hash].add_message(log_msg)
+                    # Add to existing message group
+                    added = groups[log_msg.base_hash].add_message(log_msg)
+                    if not added:
+                        # If adding to group failed, treat as a regular message
+                        daily_messages = self.context.logger_storage['daily_messages']
+                        daily_messages[log_msg.hash].append(log_msg)
             else:
+                # No numeric value, store as a regular message
                 daily_messages = self.context.logger_storage['daily_messages']
                 daily_messages[log_msg.hash].append(log_msg)
-        except:
-            # If any error occurs during value extraction, treat as regular message
-            daily_messages = self.context.logger_storage['daily_messages']
-            daily_messages[log_msg.hash].append(log_msg)
+        except Exception:
+            # Safety fallback - if anything goes wrong, store as a regular message
+            try:
+                daily_messages = self.context.logger_storage['daily_messages']
+                daily_messages[log_msg.hash].append(log_msg)
+            except:
+                # Last resort - log immediately if even storing fails
+                self._log_immediate(log_msg)
 
     def process_and_output_daily_logs(self):
         if self.context.LiveMode:
@@ -238,10 +303,12 @@ class Logger:
         current_day = self.context.Time.date()
             
         # Only process if we haven't already processed this day
-        if current_day == self.last_summary_day:
+        # Use the shared context value instead of instance variable
+        if current_day == self.context.logger_context['last_summary_day']:
             return
             
-        self.last_summary_day = current_day
+        # Update the shared context value
+        self.context.logger_context['last_summary_day'] = current_day
         
         self.context.Log("---------------------------------")
         self.context.Log(f"Daily Log Summary - {current_day}")
@@ -290,21 +357,29 @@ class Logger:
     def trace(self, msg): self.Log(msg, 4)
 
     def dataframe(self, data):
-        """Log a dataframe or convert data to a dataframe and log it.
-        
-        Args:
-            data: A pandas DataFrame or data that can be converted to a DataFrame
-            
-        Returns:
-            The DataFrame that was logged
-        """
         if isinstance(data, pd.DataFrame):
             self.Log(f"\n{data.to_string()}")
-            return data
-        try:
-            df = pd.DataFrame(data)
-            self.Log(f"\n{df.to_string()}")
-            return df
-        except:
+        else:
             self.Log(str(data))
-            return None
+
+    def summarize_dict(self, obj_dict):
+        """
+        Creates a summarized version of a dictionary of objects that have summarize methods.
+        
+        Args:
+            obj_dict (dict): Dictionary of objects with summarize methods
+            
+        Returns:
+            dict: Dictionary with the same keys but with summarized object values
+        """
+        if not obj_dict:
+            return {}
+            
+        result = {}
+        for k, v in obj_dict.items():
+            if hasattr(v, 'summarize') and callable(getattr(v, 'summarize')):
+                result[k] = v.summarize()
+            else:
+                result[k] = str(v)
+                
+        return result

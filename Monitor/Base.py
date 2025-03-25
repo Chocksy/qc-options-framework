@@ -157,7 +157,7 @@ class Base(RiskManagementModel):
 
             bookPosition.updatePnLRange(self.context.Time.date(), positionPnL)
 
-            self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId} -> bookPosition: {bookPosition}")
+            self.context.logger.debug(f"{self.__class__.__name__} -> ManageRisk -> looping through open positions -> orderTag: {orderTag}, orderId: {orderId} -> bookPosition: {bookPosition.summarize()}")
 
             # Special method to monitor the position and handle custom actions on it.
             if strategy_monitor: strategy_monitor.monitorPosition(bookPosition)

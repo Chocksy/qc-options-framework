@@ -129,8 +129,8 @@ class CentralAlgorithm(QCAlgorithm):
         # Start the timer
         self.executionTimer.start()
 
-        # Log the order event
-        self.logger.debug(orderEvent)
+        # Log the order event with proper string formatting
+        self.logger.debug(f"OrderEvent: {orderEvent.Symbol} {orderEvent.Status} - Quantity: {orderEvent.FillQuantity}, Price: {orderEvent.FillPrice}")
 
         self.performance.OnOrderEvent(orderEvent)
 

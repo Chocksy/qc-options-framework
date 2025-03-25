@@ -336,7 +336,7 @@ class LimitOrderHandlerWithCombo:
         # Calculate the range and step
         if self.base.adjustmentIncrement is None:
             # Calculate the step based on the bidAskSpread and the number of retries
-            step = execOrder.bidAskSpread / retries
+            step = execOrder.bidAskSpread / max(retries, 1)  # Prevent division by zero
         else:
             step = self.base.adjustmentIncrement
 
@@ -398,7 +398,7 @@ class LimitOrderHandlerWithCombo:
         # Calculate the range and step
         if self.base.adjustmentIncrement is None:
             # Calculate the step based on the bidAskSpread and the number of retries
-            step = execOrder.bidAskSpread / retries
+            step = execOrder.bidAskSpread / max(retries, 1)  # Prevent division by zero
         else:
             step = self.base.adjustmentIncrement
 
