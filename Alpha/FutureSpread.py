@@ -49,8 +49,8 @@ class FutureSpread(Base):
         "validateBidAskSpread": True,
         "marketCloseCutoffTime": time(15, 45, 0),
         # Put/Call Wing size for Iron Condor, Iron Fly
-        "putWingSize": 20,
-        "callWingSize": 20,
+        "putWingSize": 50,
+        "callWingSize": 50,
         # "targetPremium": 500,
     }
 

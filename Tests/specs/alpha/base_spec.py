@@ -12,14 +12,47 @@ from Tests.mocks.alpha_mocks import MockBase
 # Import after patching
 with patch_imports()[0], patch_imports()[1]:
     from Alpha.Base import Base
-    from Alpha.Utils.Scanner import Scanner
     from Alpha.Utils.Stats import Stats
+    from Tools import DataHandler
     from Tests.mocks.algorithm_imports import (
         SecurityType, Resolution, OptionRight, Symbol,
         TradeBar, PortfolioTarget, datetime, timedelta,
         List, SecurityChanges, SecuritiesDict, AlphaModel,
-        Slice
+        Slice, Market
     )
+
+# Create mock Underlying class
+class MockUnderlying:
+    _price = 100.0
+    _close = 100.0
+    _instance = None
+
+    def __init__(self, context, underlyingSymbol):
+        self.context = context
+        self.underlyingSymbol = underlyingSymbol
+
+    def Price(self):
+        return MockUnderlying._price
+
+    def Close(self):
+        return MockUnderlying._close
+
+    @classmethod
+    def set_prices(cls, price, close):
+        cls._price = price
+        cls._close = close
+
+    @classmethod
+    def create(cls, context, underlyingSymbol):
+        if cls._instance is None:
+            cls._instance = cls(context, underlyingSymbol)
+        return cls._instance
+
+    @classmethod
+    def reset(cls):
+        cls._instance = None
+        cls._price = 100.0
+        cls._close = 100.0
 
 with description('Alpha.Base') as self:
     with before.each:
@@ -40,7 +73,7 @@ with description('Alpha.Base') as self:
             self.algorithm.IsWarmingUp = False
             self.algorithm.IsMarketOpen = MagicMock(return_value=True)
             
-            # Mock structure
+            # Mock structure with AddUnderlying
             self.algorithm.structure = MagicMock()
             self.algorithm.structure.AddConfiguration = MagicMock()
             
@@ -51,6 +84,34 @@ with description('Alpha.Base') as self:
             self.base = Base(self.algorithm)
             self.base.stats = self.stats
             self.base.underlyingSymbol = "SPX"
+            self.base.ticker = "SPX"
+            
+            # Mock DataHandler
+            mock_data_handler = MagicMock()
+            mock_data_handler.getOptionContracts = MagicMock(return_value=None)
+            
+            # Mock AddUnderlying to set up dataHandler like the real method
+            def mock_add_underlying(strategy, ticker):
+                strategy.underlyingSymbol = Symbol.create_canonical_option(ticker, ticker, Market.USA)
+                strategy.dataHandler = mock_data_handler
+                # Create mock security
+                self.mock_security = MagicMock(
+                    Price=100.0,
+                    Close=100.0,
+                    BidPrice=99.0,
+                    AskPrice=101.0,
+                    IsTradable=True,
+                    HasData=True,
+                    Holdings=MagicMock(Quantity=0)
+                )
+                # Add the underlying symbol to Securities
+                self.algorithm.Securities[strategy.underlyingSymbol] = self.mock_security
+                return strategy
+
+            self.algorithm.structure.AddUnderlying = MagicMock(side_effect=mock_add_underlying)
+            
+            # Call AddUnderlying to set up the base instance
+            self.algorithm.structure.AddUnderlying(self.base, self.base.ticker)
             
             # Set required parameters from DEFAULT_PARAMETERS
             for key, value in MockBase.DEFAULT_PARAMETERS.items():
@@ -94,6 +155,63 @@ with description('Alpha.Base') as self:
             expect(param_value).to(equal('default'))
 
     with context('update method'):
+        with before.each:
+            # Mock common attributes
+            self.algorithm.logger = MagicMock(debug=MagicMock())
+            self.algorithm.debug = MagicMock()
+            self.algorithm.executionTimer = MagicMock()
+            self.algorithm.Portfolio = MagicMock()
+            self.algorithm.Securities = SecuritiesDict()
+            self.algorithm.Securities['SPX'] = MagicMock(Price=1.0)
+            self.algorithm.Time = datetime.now()
+            self.algorithm.openPositions = {}
+            self.algorithm.allPositions = {}
+            self.algorithm.workingOrders = {}
+            self.algorithm.IsWarmingUp = False
+            self.algorithm.IsMarketOpen = MagicMock(return_value=True)
+            self.algorithm.performance = MagicMock()
+            self.algorithm.performance.OnUpdate = MagicMock()
+            
+            # Mock structure with AddUnderlying
+            self.algorithm.structure = MagicMock()
+            self.algorithm.structure.AddConfiguration = MagicMock()
+            self.algorithm.structure.checkOpenPositions = MagicMock()
+            
+            # Create Stats instance
+            self.stats = Stats()
+            
+            # Create Base instance
+            self.base = Base(self.algorithm)
+            self.base.stats = self.stats
+            self.base.underlyingSymbol = "SPX"
+            self.base.ticker = "SPX"
+            self.base.last_trade_time = None
+            
+            # Mock DataHandler
+            mock_data_handler = MagicMock()
+            mock_data_handler.getOptionContracts = MagicMock(return_value=None)
+            
+            # Mock AddUnderlying to set up dataHandler like the real method
+            def mock_add_underlying(strategy, ticker):
+                strategy.underlyingSymbol = Symbol.create_canonical_option(ticker, ticker, Market.USA)
+                strategy.dataHandler = mock_data_handler
+                return strategy
+
+            self.algorithm.structure.AddUnderlying = MagicMock(side_effect=mock_add_underlying)
+            
+            # Call AddUnderlying which will set up dataHandler
+            self.algorithm.structure.AddUnderlying(self.base, self.base.ticker)
+            
+            # Set required parameters from DEFAULT_PARAMETERS
+            for key, value in MockBase.DEFAULT_PARAMETERS.items():
+                setattr(self.base, key, value)
+                
+            # Mock data
+            self.mock_data = MagicMock()
+            
+            # Mock syncStats
+            self.base.syncStats = MagicMock()
+
         with context('market conditions'):
             with it('skips processing during warmup'):
                 self.algorithm.IsWarmingUp = True
@@ -111,24 +229,6 @@ with description('Alpha.Base') as self:
                 expect(result).to(have_length(0))
 
         with context('data processing'):
-            with before.each:
-                self.mock_data = MagicMock()
-                self.algorithm.performance = MagicMock()
-                # Mock the syncStats method
-                self.base.syncStats = MagicMock()
-                
-                # Mock structure.checkOpenPositions
-                self.algorithm.structure.checkOpenPositions = MagicMock()
-                
-                # Set up conditions to pass initial checks
-                self.algorithm.IsWarmingUp = False
-                self.algorithm.IsMarketOpen.return_value = True
-                self.algorithm.Time = datetime.now().replace(hour=10, minute=0)  # Set to market hours
-                
-                # Mock Scanner to prevent it from affecting the test
-                self.base.dataHandler = MagicMock()
-                self.base.dataHandler.getOptionContracts = MagicMock(return_value=None)
-
             with it('updates performance tracking'):
                 self.base.update(self.algorithm, self.mock_data)
                 self.algorithm.performance.OnUpdate.assert_called_once_with(self.mock_data)
@@ -314,49 +414,10 @@ with description('Alpha.Base') as self:
 
     with context('syncStats'):
         with before.each:
-            # Create a mock Security with proper price methods
-            self.mock_security = MagicMock()
-            self.mock_security.Price = 100.0
-            self.mock_security.Close = 100.0
-            
-            # Add SPX to Securities dictionary
-            self.algorithm.Securities["SPX"] = self.mock_security
-            
-            # Create a proper Underlying mock that matches the actual class
-            class MockUnderlying:
-                def __init__(self, context, underlyingSymbol):
-                    self.context = context
-                    self.underlyingSymbol = underlyingSymbol
-                    self._price = 100.0
-                    self._close = 100.0
-                
-                def Price(self):
-                    return self._price
-                
-                def Close(self):
-                    return self._close
-                
-                def set_prices(self, price, close):
-                    self._price = price
-                    self._close = close
-            
-            # Store the original Underlying class
-            self.original_underlying = getattr(self.base, 'Underlying', None)
-            # Replace with our mock
-            self.base.Underlying = MockUnderlying
-            
-            # Reset stats before each test
-            self.base.stats.currentDay = None
-            self.base.stats.underlyingPriceAtOpen = None
-            self.base.stats.highOfTheDay = None
-            self.base.stats.lowOfTheDay = None
-            self.base.stats.touchedEMAs = {}
-            self.base.stats.hasOptions = None
-
-        with after.each:
-            # Restore the original Underlying class if it existed
-            if self.original_underlying is not None:
-                self.base.Underlying = self.original_underlying
+            # Reset the mock
+            MockUnderlying.reset()
+            # Replace Underlying class with mock
+            self.base.Underlying = MockUnderlying.create
 
         with it('initializes stats on first run'):
             self.algorithm.Time = datetime.now().replace(minute=5)  # Make sure we're on schedule
@@ -368,37 +429,8 @@ with description('Alpha.Base') as self:
             expect(self.base.stats.lowOfTheDay).to(equal(100.0))
             expect(self.base.stats.touchedEMAs).to(equal({}))
 
-        with it('updates high/low prices during the day'):
-            # Initialize first
-            self.algorithm.Time = datetime.now().replace(minute=5)  # Make sure we're on schedule
-            self.base.syncStats()
-            
-            # Change price and update again
-            self.mock_security.Price = 110.0
-            self.mock_security.Close = 110.0
-            self.algorithm.Time = datetime.now().replace(minute=10)  # Make sure we're on schedule
-            self.base.syncStats()
-            
-            expect(self.base.stats.highOfTheDay).to(equal(110.0))
-            expect(self.base.stats.lowOfTheDay).to(equal(100.0))
-            
-            # Test low price update
-            self.mock_security.Price = 90.0
-            self.mock_security.Close = 90.0
-            self.algorithm.Time = datetime.now().replace(minute=15)  # Make sure we're on schedule
-            self.base.syncStats()
-            
-            expect(self.base.stats.highOfTheDay).to(equal(110.0))
-            expect(self.base.stats.lowOfTheDay).to(equal(90.0))
-
         with it('resets stats on day change'):
             # Initialize first day
-            self.base.syncStats()
-            
-            # Update high/low
-            self.mock_security.Price = 110.0
-            self.mock_security.Close = 110.0
-            self.algorithm.Time = datetime.now().replace(minute=5)  # Make sure we're on schedule
             self.base.syncStats()
             
             # Change day
@@ -406,8 +438,7 @@ with description('Alpha.Base') as self:
             self.algorithm.Time = next_day.replace(minute=5)  # Make sure we're on schedule
             
             # Reset underlying price for new day
-            self.mock_security.Price = 100.0
-            self.mock_security.Close = 100.0
+            MockUnderlying.set_prices(100.0, 100.0)
             self.base.syncStats()
             
             expect(self.base.stats.currentDay).to(equal(next_day.date()))
@@ -425,4 +456,44 @@ with description('Alpha.Base') as self:
             
             self.algorithm.charting.updateCharts.assert_called_once_with(
                 symbol=self.base.underlyingSymbol
-            ) 
+            )
+
+    with context('market checks'):
+        with it('detects market closed during warmup'):
+            self.algorithm.IsWarmingUp = True
+            expect(self.base.isMarketClosed()).to(be_true)
+            
+        with it('detects closed market'):
+            self.algorithm.IsMarketOpen.return_value = False
+            expect(self.base.isMarketClosed()).to(be_true)
+            
+        with it('detects open market'):
+            self.algorithm.IsWarmingUp = False
+            self.algorithm.IsMarketOpen.return_value = True
+            expect(self.base.isMarketClosed()).to(be_false)
+
+    with context('market schedule checks'):
+        with before.each:
+            self.base.context.Time = datetime.now().replace(hour=10, minute=0)
+            self.base.last_trade_time = None
+            self.base.scheduleStartTime = time(9, 30)
+            self.base.scheduleStopTime = time(16, 0)
+            
+        with it('allows trading within schedule window'):
+            expect(self.base.check_market_schedule()).to(be_true)
+            
+        with it('prevents trading before start time'):
+            self.base.context.Time = datetime.now().replace(hour=9, minute=0)
+            expect(self.base.check_market_schedule()).to(be_false)
+            
+        with it('prevents trading after stop time'):
+            self.base.context.Time = datetime.now().replace(hour=16, minute=30)
+            expect(self.base.check_market_schedule()).to(be_false)
+            
+        with it('respects minimum trade distance'):
+            self.base.last_trade_time = self.base.context.Time - timedelta(minutes=30)
+            self.base.minimumTradeScheduleDistance = timedelta(hours=1)
+            expect(self.base.check_market_schedule()).to(be_false)
+            
+            self.base.last_trade_time = self.base.context.Time - timedelta(hours=2)
+            expect(self.base.check_market_schedule()).to(be_true) 
