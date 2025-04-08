@@ -205,6 +205,10 @@ class SetupBaseStructure:
 
             right = OptionRight.CALL if security.symbol.ID.option_right == OptionRight.PUT else OptionRight.PUT
             mirror_symbol = Symbol.create_option(security.symbol.ID.underlying.symbol, security.symbol.ID.market, security.symbol.ID.option_style, right, security.symbol.ID.strike_price, security.symbol.ID.date)
+            
+            # Log the values using self.context.debug
+            # self.context.debug(f"Option Contract Details - Symbol: {security.symbol}, Underlying: {security.symbol.ID.underlying.symbol}, Market: {security.symbol.ID.market}, Option Style: {security.symbol.ID.option_style}, Right: {right}, Strike Price: {security.symbol.ID.strike_price}, Expiration Date: {security.symbol.ID.date}, Mirror Symbol: {mirror_symbol}")
+
             try:
                 security.iv = self.context.iv(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
                 security.delta = self.context.d(security.symbol, mirror_symbol, resolution=self.context.timeResolution)
